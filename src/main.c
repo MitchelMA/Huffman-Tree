@@ -40,10 +40,24 @@ int main(void)
     huffman_node_assign_left(&root, &a_node);
     huffman_node_assign_right(&root, &bcde_branching);
 
+    int64_t path_len = 0;
+    uint8_t target = 'd';
+    bool* path = huffman_node_path(&root, target, &path_len);
+
     puts("Before clean:");
     huffman_node_print_depth(&root);
     puts("");
     printf("total-count: %llu\n", huffman_node_count(&root));
+    printf("length: %lli\n", path_len);
+    printf("Path of '%c': ", target);
+
+    if (path_len > 0)
+        for (int64_t idx = path_len - 1; idx >= 0; idx--)
+            printf("%d", path[idx]);
+    else
+        printf("-");
+
+    puts("");
 
     huffman_node_clean(&root);
 

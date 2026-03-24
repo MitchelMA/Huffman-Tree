@@ -9,6 +9,9 @@ For reference as to what a "huffman tree" or "huffman encoding" is:
 #include <stdint.h>
 #include <stdbool.h>
 
+#define HUFFMAN_BRANCH_RIGHT true
+#define HUFFMAN_BRANCH_LEFT false
+
 struct huffman_node_;
 struct node_branching_;
 struct node_leaf_;
@@ -39,6 +42,14 @@ bool huffman_node_assign_right(huffman_node* node, const huffman_node* right);
 bool huffman_node_assign_left (huffman_node* node, const huffman_node* left);
 
 uint64_t huffman_node_count(const huffman_node* node);
+
+/**
+ * Calculates the path of a given value in the tree from the persepctive of the node:
+ * i.e. in reverse.  
+ * This has to do with the fact that searching for a value is done depth first
+ * with preference to the left.
+ */
+bool* huffman_node_path(const huffman_node* root, uint8_t val, int64_t* path_length);
 
 void huffman_node_print_inline(const huffman_node* node);
 void huffman_node_print_depth (const huffman_node* node);
