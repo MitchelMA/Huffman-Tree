@@ -1,15 +1,37 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "huffman_node.h"
 #include "huffman_processing.h"
 
-static const char* test_text = "this is an example of a huffman tree";
+static const uint8_t* test_text = u8"this is an example of a huffman tree";
 
 int main(void)
 {
-    huffman_count_text(test_text, strlen(test_text));
+    dlinked_list_node* list_root = huffman_count_text(test_text, strlen((char*)test_text));
+    int leaf_count = 0;
+
+    while (true)
+    {
+        leaf_count++;
+        huffman_node_print_inline(&list_root->node);
+        printf(" -> ");
+
+        huffman_node_clean(&list_root->node);
+
+        if (list_root->next != NULL)
+            list_root = list_root->next;
+        else
+            break;
+    }
+    printf(" (%d)\n", leaf_count);
+
+    while (list_root->prev != NULL)
+        list_root = list_root->prev;
+    
+    doublyll_clean(list_root);
 
     return EXIT_SUCCESS;
 }

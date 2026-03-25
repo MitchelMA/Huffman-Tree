@@ -2,7 +2,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
 
 // --- LOCAL DEFINITIONS --- //
 
@@ -12,20 +11,20 @@ static dlinked_list_node* doublyll_create_();
 static dlinked_list_node* doublyll_get_head_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_insert_leaf_oncount_(dlinked_list_node* root, const huffman_node* entry);
 
-static char* calculate_consecutive_(char* start, char* last, huffman_node* output);
+static uint8_t* calculate_consecutive_(uint8_t* start, uint8_t* last, huffman_node* output);
 
 // --- END LOCAL DEFINITIONS --- //
 
 dlinked_list_node*
 huffman_count_text(
-    const char* text,
+    const uint8_t* text,
     int64_t length
 )
 {
     if (text == NULL || length <= 0)
         return NULL;
 
-    char* text_copy = malloc(length + 1);
+    uint8_t* text_copy = malloc(sizeof(uint8_t) * (length + 1));
     if (text_copy == NULL)
         return NULL;
 
@@ -35,7 +34,7 @@ huffman_count_text(
         return NULL;
     }
 
-    qsort(text_copy, length, sizeof(char), compare_symbol_);
+    qsort(text_copy, length, sizeof(uint8_t), compare_symbol_);
 
     dlinked_list_node* list_root = doublyll_create_();
 
@@ -43,28 +42,41 @@ huffman_count_text(
     // to initialize properly
 
     uintptr_t end = (uintptr_t)(text_copy + length);
-    char* after = calculate_consecutive_(text_copy, (char*)end, &list_root->node);
+    uint8_t* after = calculate_consecutive_(text_copy, (uint8_t*)end, &list_root->node);
 
+    // Then exaustively insert the rest of the found characters as nodes to the linked listed
     while (after != NULL)
     {
         huffman_node symbol_node = {0};
-        after = calculate_consecutive_(after, (char*)end, &symbol_node);
+        after = calculate_consecutive_(after, (uint8_t*)end, &symbol_node);
         doublyll_insert_leaf_oncount_(list_root, &symbol_node);
     }
 
+    // Wont need the copy after this point
+    free(text_copy);
+
     list_root = doublyll_get_head_(list_root);
-    while (list_root != NULL)
+
+    return list_root;
+}
+
+void
+doublyll_clean(
+    dlinked_list_node* root
+)
+{
+    root = doublyll_get_head_(root);
+
+    while (root != NULL)
     {
-        huffman_node_print_inline(&list_root->node);
-        printf(" -> ");
+        dlinked_list_node* next = root->next;
+        root->prev = NULL;
+        root->next = NULL;
 
-        list_root = list_root->next;
+        free(root);
+
+        root = next;
     }
-
-    puts("");
-
-
-    return NULL;
 }
 
 // --- LOCAL IMPLEMENTATIONS --- //
@@ -127,7 +139,7 @@ doublyll_insert_leaf_oncount_(
 
     // When we stumbled upon an entry that is the same in count,
     // we search alpabetically for the first entry that should alpabetically
-    // come first
+    // come after the current value
     if (huffman_node_count(&current->node) == entry_count)
     {
         while (current != NULL && current->next != NULL &&
@@ -176,17 +188,17 @@ doublyll_insert_leaf_oncount_(
     return new_entry_node;
 }
 
-char*
+uint8_t*
 calculate_consecutive_(
-    char* start,
-    char* last,
+    uint8_t* start,
+    uint8_t* last,
     huffman_node* output
 )
 {
     if (start >= last)
         return NULL;
 
-    char* current = start;
+    uint8_t* current = start;
 
     if (!huffman_node_init_leaf(output, *current, 0))
         return NULL;
