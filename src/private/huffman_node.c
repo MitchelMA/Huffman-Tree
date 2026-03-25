@@ -131,6 +131,24 @@ huffman_node_count(
            huffman_node_count(node->type.branching.right);
 }
 
+int
+huffman_node_compare(
+    const huffman_node* a,
+    const huffman_node* b
+)
+{
+    // First compare the count of a against b
+    int count_compare = huffman_node_count(a) - huffman_node_count(b);
+
+    // Then when either one is not a leaf, immediately return
+    // when the count-compare is 0
+    if (count_compare != 0 || (a->is_branching || b->is_branching))
+        return count_compare;
+
+    // Otherwise we also test for alpanumerical value
+    return b->type.leaf.val - a->type.leaf.val;
+}
+
 bool*
 huffman_node_path(
     const huffman_node* root,

@@ -123,7 +123,6 @@ doublyll_insert_leaf_oncount_(
 )
 {
     const uint64_t entry_count = huffman_node_count(entry);
-    const uint8_t    entry_val = entry->type.leaf.val;
     if (entry_count == 0)
         return NULL;
 
@@ -131,23 +130,10 @@ doublyll_insert_leaf_oncount_(
     dlinked_list_node* current = root;
 
     // Search for the first entry in the list
-    // that is equal or tinier in count
-
+    // that the new entry is tinier to in comparison.
     while (current != NULL && current->next != NULL &&
-           huffman_node_count(&current->node) > entry_count)
+           huffman_node_compare(entry, &current->node) < 0)
         current = current->next;
-
-    // When we stumbled upon an entry that is the same in count,
-    // we search alpabetically for the first entry that should alpabetically
-    // come after the current value
-    if (huffman_node_count(&current->node) == entry_count)
-    {
-        while (current != NULL && current->next != NULL &&
-               huffman_node_count(&current->node) == entry_count &&
-               current->node.type.leaf.val < entry_val)
-
-            current = current->next;
-    }
 
     // Create a new dll-node to contain the huffman-node
     dlinked_list_node* new_entry_node = doublyll_create_();

@@ -17,7 +17,7 @@ int main(void)
     {
         leaf_count++;
         huffman_node_print_inline(&list_root->node);
-        printf(" -> ");
+        printf(" <-> ");
 
         huffman_node_clean(&list_root->node);
 
@@ -26,7 +26,7 @@ int main(void)
         else
             break;
     }
-    printf(" (%d)\n", leaf_count);
+    printf("\b\b\b\b(%d)\n", leaf_count);
 
     while (list_root->prev != NULL)
         list_root = list_root->prev;

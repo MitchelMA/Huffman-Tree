@@ -42,6 +42,7 @@ bool huffman_node_assign_right(huffman_node* node, const huffman_node* right);
 bool huffman_node_assign_left (huffman_node* node, const huffman_node* left);
 
 uint64_t huffman_node_count(const huffman_node* node);
+int huffman_node_compare(const huffman_node* a, const huffman_node* b);
 
 /**
  * Calculates the path of a given value in the tree from the persepctive of the node:
