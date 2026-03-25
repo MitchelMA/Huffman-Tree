@@ -1,4 +1,4 @@
-#include "HuffmanNode.h"
+#include "huffman_node.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -159,7 +159,7 @@ huffman_node_print_inline(
 
     if (!node->is_branching)
     {
-        printf("{ %c, %llu }", node->type_.leaf.val, node->type_.leaf.count);
+        printf("{ '%c', %llu }", node->type_.leaf.val, node->type_.leaf.count);
     }
     else
     {
@@ -196,7 +196,7 @@ huffman_node_print_depth_impl_(
 
     if (!node->is_branching)
     {
-        printf("%.*s< %c, %llu >", depth, tabs, node->type_.leaf.val, node->type_.leaf.count);
+        printf("%.*s< '%c', %llu >", depth, tabs, node->type_.leaf.val, node->type_.leaf.count);
     }
     else
     {

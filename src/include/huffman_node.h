@@ -1,5 +1,5 @@
-#ifndef HUFFMAN_HUFFMANNODE_H
-#define HUFFMAN_HUFFMANNODE_H
+#ifndef HUFFMAN_HUFFMAN_NODE_H
+#define HUFFMAN_HUFFMAN_NODE_H
 
 /*
 For reference as to what a "huffman tree" or "huffman encoding" is:
@@ -55,5 +55,5 @@ void huffman_node_print_inline(const huffman_node* node);
 void huffman_node_print_depth (const huffman_node* node);
 
 
-#endif // !HUFFMAN_HUFFMANNODE_H
+#endif // !HUFFMAN_HUFFMAN_NODE_H
 

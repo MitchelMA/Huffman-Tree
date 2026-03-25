@@ -1,9 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "HuffmanNode.h"
+#include "huffman_node.h"
+#include "huffman_processing.h"
+
+static const char* test_text = "this is an example of a huffman tree";
 
 int main(void)
+{
+    huffman_count_text(test_text, strlen(test_text));
+
+    return EXIT_SUCCESS;
+}
+
+int main2(void)
 {
     huffman_node a_node = {0};
     huffman_node_init_leaf(&a_node, 'a', 15);
