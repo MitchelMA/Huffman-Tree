@@ -22,8 +22,8 @@ huffman_node_init_leaf(
 )
 {
     node->is_branching = false;
-    node->type_.leaf.val   = value;
-    node->type_.leaf.count = count;
+    node->type.leaf.val   = value;
+    node->type.leaf.count = count;
 
     return true;
 }
@@ -34,8 +34,8 @@ huffman_node_init_branching(
 )
 {
     node->is_branching = true;
-    node->type_.branching.right = NULL;
-    node->type_.branching.left  = NULL;
+    node->type.branching.right = NULL;
+    node->type.branching.left  = NULL;
 
     return true;
 }
@@ -50,13 +50,13 @@ huffman_node_clean(
 
     if (!node->is_branching)
     {
-        node->type_.leaf.val = 0;
-        node->type_.leaf.count = 0;
+        node->type.leaf.val = 0;
+        node->type.leaf.count = 0;
         return;
     }
 
-    huffman_node* right = node->type_.branching.right;
-    huffman_node* left = node->type_.branching.left;
+    huffman_node* right = node->type.branching.right;
+    huffman_node* left = node->type.branching.left;
 
     if (right != NULL)
         huffman_node_clean(right);
@@ -70,8 +70,8 @@ huffman_node_clean(
     if (left != NULL)
         free(left);
 
-    node->type_.branching.right = NULL;
-    node->type_.branching.left  = NULL;
+    node->type.branching.right = NULL;
+    node->type.branching.left  = NULL;
 }
 
 bool
@@ -83,16 +83,16 @@ huffman_node_assign_right(
     if (!node->is_branching)
         return false;
 
-    if (node->type_.branching.right != NULL)
+    if (node->type.branching.right != NULL)
         return false;
 
-    node->type_.branching.right = malloc(sizeof(huffman_node));
-    if (node->type_.branching.right == NULL)
+    node->type.branching.right = malloc(sizeof(huffman_node));
+    if (node->type.branching.right == NULL)
         return false;
 
-    void* result = memcpy(node->type_.branching.right, right, sizeof(huffman_node));
+    void* result = memcpy(node->type.branching.right, right, sizeof(huffman_node));
 
-    return result == node->type_.branching.right;
+    return result == node->type.branching.right;
 }
 
 bool
@@ -104,16 +104,16 @@ huffman_node_assign_left(
     if (!node->is_branching)
         return false;
 
-    if (node->type_.branching.left != NULL)
+    if (node->type.branching.left != NULL)
         return false;
 
-    node->type_.branching.left = malloc(sizeof(huffman_node));
-    if (node->type_.branching.left == NULL)
+    node->type.branching.left = malloc(sizeof(huffman_node));
+    if (node->type.branching.left == NULL)
         return false;
 
-    void* result = memcpy(node->type_.branching.left, left, sizeof(huffman_node));
+    void* result = memcpy(node->type.branching.left, left, sizeof(huffman_node));
 
-    return result == node->type_.branching.left;
+    return result == node->type.branching.left;
 }
 
 uint64_t
@@ -125,10 +125,10 @@ huffman_node_count(
         return 0;
 
     if (!node->is_branching)
-        return node->type_.leaf.count;
+        return node->type.leaf.count;
 
-    return huffman_node_count(node->type_.branching.left) +
-           huffman_node_count(node->type_.branching.right);
+    return huffman_node_count(node->type.branching.left) +
+           huffman_node_count(node->type.branching.right);
 }
 
 bool*
@@ -159,14 +159,14 @@ huffman_node_print_inline(
 
     if (!node->is_branching)
     {
-        printf("{ '%c', %llu }", node->type_.leaf.val, node->type_.leaf.count);
+        printf("{ '%c', %llu }", node->type.leaf.val, node->type.leaf.count);
     }
     else
     {
         printf("{ ");
-        huffman_node_print_inline(node->type_.branching.left);
+        huffman_node_print_inline(node->type.branching.left);
         printf(", ");
-        huffman_node_print_inline(node->type_.branching.right);
+        huffman_node_print_inline(node->type.branching.right);
         printf(" }");
     }
 }
@@ -196,14 +196,14 @@ huffman_node_print_depth_impl_(
 
     if (!node->is_branching)
     {
-        printf("%.*s< '%c', %llu >", depth, tabs, node->type_.leaf.val, node->type_.leaf.count);
+        printf("%.*s< '%c', %llu >", depth, tabs, node->type.leaf.val, node->type.leaf.count);
     }
     else
     {
         printf("%.*s{\n", depth, tabs);
-        huffman_node_print_depth_impl_(node->type_.branching.left, depth + 1);
+        huffman_node_print_depth_impl_(node->type.branching.left, depth + 1);
         printf(",\n");
-        huffman_node_print_depth_impl_(node->type_.branching.right, depth + 1);
+        huffman_node_print_depth_impl_(node->type.branching.right, depth + 1);
         printf("\n%.*s}", depth, tabs);
     }
 }
@@ -219,13 +219,13 @@ huffman_node_path_impl_(
     if (root == NULL || !root->is_branching)
         return false;
 
-    if (huffman_node_path_inner_(root->type_.branching.left, val, path, len))
+    if (huffman_node_path_inner_(root->type.branching.left, val, path, len))
     {
         path[(*len)++] = HUFFMAN_BRANCH_LEFT;
         return true;
     }
 
-    if (huffman_node_path_inner_(root->type_.branching.right, val, path, len))
+    if (huffman_node_path_inner_(root->type.branching.right, val, path, len))
     {
         path[(*len)++] = HUFFMAN_BRANCH_RIGHT;
         return true;
@@ -246,15 +246,15 @@ huffman_node_path_inner_(
         return false;
 
     if (!root->is_branching)
-        return root->type_.leaf.val == val;
+        return root->type.leaf.val == val;
 
-    if (huffman_node_path_inner_(root->type_.branching.left, val, path, len))
+    if (huffman_node_path_inner_(root->type.branching.left, val, path, len))
     {
         path[(*len)++] = HUFFMAN_BRANCH_LEFT;
         return true;
     }
 
-    if (huffman_node_path_inner_(root->type_.branching.right, val, path, len))
+    if (huffman_node_path_inner_(root->type.branching.right, val, path, len))
     {
         path[(*len)++] = HUFFMAN_BRANCH_RIGHT;
         return true;

@@ -123,7 +123,7 @@ doublyll_insert_leaf_oncount_(
 )
 {
     const uint64_t entry_count = huffman_node_count(entry);
-    const uint8_t    entry_val = entry->type_.leaf.val;
+    const uint8_t    entry_val = entry->type.leaf.val;
     if (entry_count == 0)
         return NULL;
 
@@ -144,7 +144,7 @@ doublyll_insert_leaf_oncount_(
     {
         while (current != NULL && current->next != NULL &&
                huffman_node_count(&current->node) == entry_count &&
-               current->node.type_.leaf.val < entry_val)
+               current->node.type.leaf.val < entry_val)
 
             current = current->next;
     }
@@ -203,9 +203,9 @@ calculate_consecutive_(
     if (!huffman_node_init_leaf(output, *current, 0))
         return NULL;
 
-    while (current < last && output->type_.leaf.val == *current)
+    while (current < last && output->type.leaf.val == *current)
     {
-        output->type_.leaf.count++;
+        output->type.leaf.count++;
         current++;
     }
 
@@ -213,3 +213,4 @@ calculate_consecutive_(
 }
 
 // --- END LOCAL DEFINITIONS --- //
+
