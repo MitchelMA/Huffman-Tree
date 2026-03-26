@@ -1,7 +1,9 @@
 #include "huffman_processing.h"
 
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+
 
 // --- LOCAL DEFINITIONS --- //
 
@@ -9,6 +11,8 @@ static int compare_symbol_(const void* a, const void* b);
 
 static dlinked_list_node* doublyll_create_();
 static dlinked_list_node* doublyll_get_head_(dlinked_list_node* node);
+static dlinked_list_node* doublyll_get_tail_(dlinked_list_node* node);
+static size_t doublyll_get_length_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_insert_leaf_oncount_(dlinked_list_node* root, const huffman_node* entry);
 
 static uint8_t* calculate_consecutive_(uint8_t* start, uint8_t* last, huffman_node* output);
@@ -79,6 +83,69 @@ doublyll_clean(
     }
 }
 
+huffman_node
+huffman_construct_tree(
+    dlinked_list_node* root
+)
+{
+    while (doublyll_get_length_(root) > 1)
+    {
+        root = doublyll_get_head_(root);
+
+        dlinked_list_node*    ultimate_node = doublyll_get_tail_(root);
+        dlinked_list_node* penultimate_node = ultimate_node->prev;
+        dlinked_list_node* chain_linker = penultimate_node->prev;
+
+        // Disconnect the last two from the linked-list
+        if (chain_linker != NULL)
+            chain_linker->next = NULL;
+
+        penultimate_node->prev = NULL;
+        penultimate_node->next = NULL;
+        ultimate_node->prev = NULL;
+
+        // Create a branching huffman-node that will be the
+        // parent of the ultimate and penultimate nodes
+
+        huffman_node parent = {0};
+        huffman_node_init_branching(&parent);
+
+        huffman_node_assign_left(&parent, &penultimate_node->node);
+        huffman_node_assign_right(&parent, &ultimate_node->node);
+
+        // Clean up the tail of the list, as this won't be reused
+        doublyll_clean(ultimate_node);
+
+        // Copy the branching parent over into the penultimate-node
+        memcpy(&penultimate_node->node, &parent, sizeof(huffman_node));
+
+        if (penultimate_node == root)
+            break;
+
+        // Find the best fitting reinsert target for the penultimate-node.
+        dlinked_list_node* target = root;
+
+        while (target != NULL && target->next != NULL &&
+               huffman_node_compare(&penultimate_node->node, &target->node) <= 0)
+            target = target->next;
+
+        // Insert the penultimate-node before the found target
+        dlinked_list_node* prev = target->prev;
+
+        if (prev != NULL)
+            prev->next = penultimate_node;
+
+        penultimate_node->prev = prev;
+        penultimate_node->next = target;
+        target->prev = penultimate_node;
+    }
+
+    huffman_node huffman_root = root->node;
+    doublyll_clean(root);
+
+    return huffman_root;
+}
+
 // --- LOCAL IMPLEMENTATIONS --- //
 
 int
@@ -114,6 +181,34 @@ doublyll_get_head_(
         node = node->prev;
 
     return node;
+}
+
+dlinked_list_node*
+doublyll_get_tail_(
+    dlinked_list_node* node
+)
+{
+    while (node != NULL && node->next != NULL)
+        node = node->next;
+
+    return node;
+}
+
+size_t
+doublyll_get_length_(
+    dlinked_list_node* node
+)
+{
+    dlinked_list_node* root = doublyll_get_head_(node);
+    size_t count = 1;
+
+    while (root != NULL && root->next != NULL)
+    {
+        root = root->next;
+        count++;
+    }
+
+    return count;
 }
 
 dlinked_list_node*

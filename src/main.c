@@ -8,30 +8,68 @@
 
 static const uint8_t* test_text = u8"this is an example of a huffman tree";
 
-int main(void)
+void doublyll_print(dlinked_list_node* root)
 {
-    dlinked_list_node* list_root = huffman_count_text(test_text, strlen((char*)test_text));
     int leaf_count = 0;
 
     while (true)
     {
         leaf_count++;
-        huffman_node_print_inline(&list_root->node);
+        huffman_node_print_inline(&root->node);
         printf(" <-> ");
 
-        huffman_node_clean(&list_root->node);
-
-        if (list_root->next != NULL)
-            list_root = list_root->next;
+        if (root->next != NULL)
+            root = root->next;
         else
             break;
     }
     printf("\b\b\b\b(%d)\n", leaf_count);
+}
 
-    while (list_root->prev != NULL)
-        list_root = list_root->prev;
-    
-    doublyll_clean(list_root);
+void print_path(const huffman_node* root, uint8_t symbol)
+{
+    int64_t path_len = 0;
+    bool* bool_arr = huffman_node_path(root, symbol, &path_len);
+
+    printf("path for '%c': ", symbol);
+
+    path_len--;
+    for (; path_len >= 0; path_len--)
+        printf("%d", bool_arr[path_len]);
+    puts("");
+}
+
+int main(void)
+{
+    dlinked_list_node* list_root = huffman_count_text(test_text, strlen((char*)test_text));
+    doublyll_print(list_root);
+    puts("");
+
+    huffman_node huffman_root = huffman_construct_tree(list_root);
+
+    huffman_node_print_depth(&huffman_root);
+    puts("");
+    print_path(&huffman_root, ' ');
+    print_path(&huffman_root, 'a');
+    print_path(&huffman_root, 'e');
+    print_path(&huffman_root, 'f');
+    print_path(&huffman_root, 'h');
+    print_path(&huffman_root, 'i');
+    print_path(&huffman_root, 'm');
+    print_path(&huffman_root, 'n');
+    print_path(&huffman_root, 's');
+    print_path(&huffman_root, 't');
+    print_path(&huffman_root, 'l');
+    print_path(&huffman_root, 'o');
+    print_path(&huffman_root, 'p');
+    print_path(&huffman_root, 'r');
+    print_path(&huffman_root, 'u');
+    print_path(&huffman_root, 'x');
+
+    huffman_node_clean(&huffman_root);
+
+    puts("");
+
 
     return EXIT_SUCCESS;
 }

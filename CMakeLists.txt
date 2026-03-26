@@ -34,7 +34,7 @@ else()
     set(BUILD_PARAMS
         -std=c23
         -Wall -Wextra -Wpedantic -pedantic -Wundef
-        $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:-O -g -ggdb>
+        $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:-O0 -g -ggdb>
         $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,RELEASE>:-Werror -O3>)
 endif()
 
