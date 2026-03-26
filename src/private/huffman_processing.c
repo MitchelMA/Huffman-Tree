@@ -12,6 +12,8 @@ static int compare_symbol_(const void* a, const void* b);
 static dlinked_list_node* doublyll_create_();
 static dlinked_list_node* doublyll_get_head_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_get_tail_(dlinked_list_node* node);
+static dlinked_list_node* doublyll_insert_before_(dlinked_list_node* target, dlinked_list_node* inserted);
+static dlinked_list_node* doublyll_insert_after_(dlinked_list_node* target, dlinked_list_node* inserted);
 static size_t doublyll_get_length_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_insert_leaf_oncount_(dlinked_list_node* root, const huffman_node* entry);
 
@@ -64,25 +66,6 @@ huffman_count_text(
     return list_root;
 }
 
-void
-doublyll_clean(
-    dlinked_list_node* root
-)
-{
-    root = doublyll_get_head_(root);
-
-    while (root != NULL)
-    {
-        dlinked_list_node* next = root->next;
-        root->prev = NULL;
-        root->next = NULL;
-
-        free(root);
-
-        root = next;
-    }
-}
-
 huffman_node
 huffman_construct_tree(
     dlinked_list_node* root
@@ -109,7 +92,6 @@ huffman_construct_tree(
 
         huffman_node parent = {0};
         huffman_node_init_branching(&parent);
-
         huffman_node_assign_left(&parent, &penultimate_node->node);
         huffman_node_assign_right(&parent, &ultimate_node->node);
 
@@ -129,21 +111,41 @@ huffman_construct_tree(
                huffman_node_compare(&penultimate_node->node, &target->node) <= 0)
             target = target->next;
 
-        // Insert the penultimate-node before the found target
-        dlinked_list_node* prev = target->prev;
+        const int comp = huffman_node_compare(&penultimate_node->node, &target->node);
 
-        if (prev != NULL)
-            prev->next = penultimate_node;
+        // Insert *before* the target if the 'to be inserted'-node is
+        // larger
+        if (comp > 0)
+            doublyll_insert_before_(target, penultimate_node);
 
-        penultimate_node->prev = prev;
-        penultimate_node->next = target;
-        target->prev = penultimate_node;
+        // Otherwise it comes *after*
+        else
+            doublyll_insert_after_(target, penultimate_node);
     }
 
     huffman_node huffman_root = root->node;
     doublyll_clean(root);
 
     return huffman_root;
+}
+
+void
+doublyll_clean(
+    dlinked_list_node* root
+)
+{
+    root = doublyll_get_head_(root);
+
+    while (root != NULL)
+    {
+        dlinked_list_node* next = root->next;
+        root->prev = NULL;
+        root->next = NULL;
+
+        free(root);
+
+        root = next;
+    }
 }
 
 // --- LOCAL IMPLEMENTATIONS --- //
@@ -194,6 +196,42 @@ doublyll_get_tail_(
     return node;
 }
 
+dlinked_list_node*
+doublyll_insert_before_(
+    dlinked_list_node* target,
+    dlinked_list_node* inserted
+)
+{
+    dlinked_list_node* prev = target->prev;
+
+    if (prev != NULL)
+        prev->next = inserted;
+
+    inserted->prev = prev;
+    inserted->next = target;
+    target->prev = inserted;
+
+    return inserted;
+}
+
+dlinked_list_node*
+doublyll_insert_after_(
+    dlinked_list_node* target,
+    dlinked_list_node* inserted
+)
+{
+    dlinked_list_node* next = target->next;
+
+    if (next != NULL)
+        next->prev = inserted;
+
+    inserted->next = next;
+    inserted->prev = target;
+    target->next = inserted;
+
+    return inserted;
+}
+
 size_t
 doublyll_get_length_(
     dlinked_list_node* node
@@ -242,29 +280,11 @@ doublyll_insert_leaf_oncount_(
     // When the found count is smaller than the entry,
     // we insert *before* the found one
     if (huffman_node_count(&current->node) < entry_count)
-    {
-        dlinked_list_node* prev = current->prev;
-        
-        if (prev != NULL)
-            prev->next = new_entry_node;
-
-        new_entry_node->prev = prev;
-        new_entry_node->next = current;
-        current->prev = new_entry_node;
-    }
+        doublyll_insert_before_(current, new_entry_node);
 
     // Otherwise we insert *after*
     else
-    {
-        dlinked_list_node* next = current->next;
-
-        if (next != NULL)
-            next->prev = new_entry_node;
-
-        new_entry_node->prev = current;
-        new_entry_node->next = next;
-        current->next = new_entry_node;
-    }
+        doublyll_insert_after_(current, new_entry_node);
 
     return new_entry_node;
 }

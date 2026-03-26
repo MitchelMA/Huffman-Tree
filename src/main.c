@@ -7,6 +7,7 @@
 #include "huffman_processing.h"
 
 static const uint8_t* test_text = u8"this is an example of a huffman tree";
+// static const uint8_t* test_text_back = u8"this is an example of a huffman treeloprloprhimnst";
 
 void doublyll_print(dlinked_list_node* root)
 {
@@ -49,6 +50,7 @@ int main(void)
 
     huffman_node_print_depth(&huffman_root);
     puts("");
+
     print_path(&huffman_root, ' ');
     print_path(&huffman_root, 'a');
     print_path(&huffman_root, 'e');
