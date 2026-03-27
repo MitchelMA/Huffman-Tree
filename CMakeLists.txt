@@ -54,6 +54,6 @@ FetchContent_Declare(
     GIT_TAG main
 )
 
-# FetchContent_MakeAvailable(CVector CString CCommandArgParser)
+FetchContent_MakeAvailable(CVector)
 
 add_subdirectory(src)

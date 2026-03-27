@@ -5,6 +5,7 @@
 
 #include "huffman_node.h"
 #include "huffman_processing.h"
+#include "bitarray.h"
 
 static const uint8_t* test_text = u8"this is an example of a huffman tree";
 // static const uint8_t* test_text_back = u8"this is an example of a huffman treeloprloprhimnst";
@@ -40,6 +41,49 @@ void print_path(const huffman_node* root, uint8_t symbol)
     puts("");
 }
 
+void print_compressed_text(const uint8_t* text, const huffman_node* tree)
+{
+    const int64_t length = strlen((char*)text);
+    for (int64_t idx = 0; idx < length; idx++)
+    {
+        int64_t path_len = 0;
+        bool* path = huffman_node_path(tree, text[idx], &path_len);
+        while (path_len-- > 0)
+            printf("%d", path[path_len]);
+
+        printf("");
+    }
+    puts("");
+}
+
+void print_uncompressed_text(const uint8_t* text)
+{
+    const int64_t length = strlen((char*)text);
+    for (int64_t idx = 0; idx < length; idx++)
+    {
+        for (int off = 7; off >= 0; off--)
+        {
+            int mask = (1 << off);
+            int value = text[idx] & mask;
+            printf("%d", value > 0);
+        }
+        printf("");
+    }
+
+    puts("");
+}
+
+void print_bitarr(const bitarray* bitarray)
+{
+    for (int64_t i = 0; i < (int64_t)bitarray->length; i++)
+    {
+        if (i % 8 == 0 && i != 0)
+            printf("");
+
+        printf("%d", bitarray_value_at(bitarray, i));
+    }
+}
+
 int main(void)
 {
     dlinked_list_node* list_root = huffman_count_text(test_text, strlen((char*)test_text));
@@ -68,76 +112,47 @@ int main(void)
     print_path(&huffman_root, 'u');
     print_path(&huffman_root, 'x');
 
+    puts("");
+
+    printf("text: %s\n", test_text);
+    puts("compressed:");
+    print_compressed_text(test_text, &huffman_root);
+    puts("uncompressed:");
+    print_uncompressed_text(test_text);
+
+
+    bitarray my_bitarr = {0};
+    bitarray_init(&my_bitarr);
+
+    const int64_t length = strlen((char*)test_text);
+    for (int64_t idx = 0; idx < length; idx++)
+    {
+        int64_t path_len = 0;
+        bool* path = huffman_node_path(&huffman_root, test_text[idx], &path_len);
+        while (path_len-- > 0)
+            bitarray_append_bit(&my_bitarr, path[path_len]);
+    }
+
+    const int byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
+    printf("\nlength: %zu (%d)\n", my_bitarr.length, byte_count);
+    printf("bit-array:\n");
+    print_bitarr(&my_bitarr);
+    puts("");
+
+    char* buf = (char*)vector_get_start_addr_(my_bitarr.content);
+    puts("\nbinary-char-print-test:");
+    for (int i = 0; i < byte_count; i++)
+        printf("%08hhb", buf[i]);
+    puts("|");
+
+    puts("\nchar-print-test:");
+    for (int i = 0; i < byte_count; i++)
+        printf("%c", buf[i]);
+    puts("|");
+
+    bitarray_clean(&my_bitarr);
     huffman_node_clean(&huffman_root);
 
-    puts("");
-
-
     return EXIT_SUCCESS;
 }
 
-int main2(void)
-{
-    huffman_node a_node = {0};
-    huffman_node_init_leaf(&a_node, 'a', 15);
-
-    huffman_node b_node = {0};
-    huffman_node_init_leaf(&b_node, 'b', 7);
-
-    huffman_node c_node = {0};
-    huffman_node_init_leaf(&c_node, 'c', 6);
-
-    huffman_node d_node = {0};
-    huffman_node_init_leaf(&d_node, 'd', 6);
-
-    huffman_node e_node = {0};
-    huffman_node_init_leaf(&e_node, 'e', 5);
-
-    huffman_node de_branching = {0};
-    huffman_node_init_branching(&de_branching);
-    huffman_node_assign_left(&de_branching, &d_node);
-    huffman_node_assign_right(&de_branching, &e_node);
-
-    huffman_node bc_branching = {0};
-    huffman_node_init_branching(&bc_branching);
-    huffman_node_assign_left(&bc_branching, &b_node);
-    huffman_node_assign_right(&bc_branching, &c_node);
-
-    huffman_node bcde_branching = {0};
-    huffman_node_init_branching(&bcde_branching);
-    huffman_node_assign_left(&bcde_branching, &bc_branching);
-    huffman_node_assign_right(&bcde_branching, &de_branching);
-
-    huffman_node root = {0};
-    huffman_node_init_branching(&root);
-    huffman_node_assign_left(&root, &a_node);
-    huffman_node_assign_right(&root, &bcde_branching);
-
-    int64_t path_len = 0;
-    uint8_t target = 'd';
-    bool* path = huffman_node_path(&root, target, &path_len);
-
-    puts("Before clean:");
-    huffman_node_print_depth(&root);
-    puts("");
-    printf("total-count: %llu\n", huffman_node_count(&root));
-    printf("length: %lli\n", path_len);
-    printf("Path of '%c': ", target);
-
-    if (path_len > 0)
-        for (int64_t idx = path_len - 1; idx >= 0; idx--)
-            printf("%d", path[idx]);
-    else
-        printf("-");
-
-    puts("");
-
-    huffman_node_clean(&root);
-
-    puts("After clean:");
-    huffman_node_print_depth(&root);
-    puts("");
-    printf("total-count: %llu\n", huffman_node_count(&root));
-
-    return EXIT_SUCCESS;
-}

@@ -4,6 +4,10 @@ add_executable(HuffmanTree
     main.c
     ${PRIVATE_SOURCES})
 
+target_link_libraries(HuffmanTree
+    PUBLIC
+    CVector)
+
 target_compile_options(HuffmanTree
     PUBLIC
     ${BUILD_PARAMS})
