@@ -164,6 +164,21 @@ huffman_node_path(
     return path_array;
 }
 
+huffman_node*
+huffman_node_traverse(
+    const huffman_node* node,
+    bool branch
+)
+{
+    if (node == NULL || !node->is_branching)
+        return NULL;
+
+    if (branch)
+        return node->type.branching.right;
+
+    return node->type.branching.left;
+}
+
 void
 huffman_node_print_inline(
     const huffman_node* node

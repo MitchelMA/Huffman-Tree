@@ -87,6 +87,40 @@ void print_bitarr(const bitarray* bitarray)
 
 int main(void)
 {
+    const size_t text_length = strlen((char*)test_text);
+    printf("Text: (%lu)\n%s\n", text_length, test_text);
+
+    dlinked_list_node* list_root = huffman_count_text(test_text, text_length);
+    huffman_node huffman_root = huffman_construct_tree(list_root);
+
+    bitarray my_bitarr = huffman_compress(&huffman_root, text_length, test_text);
+    printf("Bitarray: (%li)\n", my_bitarr.length);
+    print_bitarr(&my_bitarr);
+    puts("");
+
+    FILE* fp = open_file_write("./bitarray.txt");
+    bitarray_write_file(&my_bitarr, fp, -1);
+    bitarray_clean(&my_bitarr);
+    rewind(fp);
+
+    bitarray file_read = {0};
+    bitarray_init(&file_read);
+    bitarray_read_file(&file_read, fp, -1);
+    close_file(fp);
+
+    char BUFF[1024] = {0};
+
+    huffman_decompress(&huffman_root, &file_read, 1024, (uint8_t*)BUFF);
+    huffman_node_clean(&huffman_root);
+    bitarray_clean(&file_read);
+
+    printf("Recovered: (%lu)\n%s\n", strlen(BUFF), BUFF);
+
+    return EXIT_SUCCESS;
+}
+
+int main2(void)
+{
     dlinked_list_node* list_root = huffman_count_text(test_text, strlen((char*)test_text));
     doublyll_print(list_root);
     puts("");

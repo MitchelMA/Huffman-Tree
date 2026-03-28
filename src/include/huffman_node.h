@@ -52,6 +52,8 @@ int huffman_node_compare(const huffman_node* a, const huffman_node* b);
  */
 bool* huffman_node_path(const huffman_node* root, uint8_t val, int64_t* path_length);
 
+huffman_node* huffman_node_traverse(const huffman_node* node, bool branch);
+
 void huffman_node_print_inline(const huffman_node* node);
 void huffman_node_print_depth (const huffman_node* node);
 

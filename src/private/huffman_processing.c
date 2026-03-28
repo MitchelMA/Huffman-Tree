@@ -9,7 +9,7 @@
 
 static int compare_symbol_(const void* a, const void* b);
 
-static dlinked_list_node* doublyll_create_();
+static dlinked_list_node* doublyll_create_(void);
 static dlinked_list_node* doublyll_get_head_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_get_tail_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_insert_before_(dlinked_list_node* target, dlinked_list_node* inserted);
@@ -129,6 +129,68 @@ huffman_construct_tree(
     return huffman_root;
 }
 
+bitarray
+huffman_compress(
+    const huffman_node* root,
+    const size_t buffer_size,
+    const uint8_t* buffer
+)
+{
+    if (root == NULL || buffer == NULL || buffer_size == 0)
+        return (bitarray){0};
+
+    bitarray bit_array = {0};
+    bitarray_init(&bit_array);
+
+    for (size_t idx = 0; idx < buffer_size; idx++)
+    {
+        int64_t path_len = 0;
+        bool* path = huffman_node_path(root, buffer[idx], &path_len);
+        while (path_len-- > 0)
+            bitarray_append_bit(&bit_array, path[path_len]);
+    }
+
+    return bit_array;
+}
+
+size_t
+huffman_decompress(
+    const huffman_node* root,
+    const bitarray* bit_array,
+    size_t buffer_size,
+    uint8_t* buffer
+)
+{
+    if (root == NULL || bit_array == NULL || buffer_size == 0 || buffer == NULL)
+        return 0;
+
+    const bitarray_length_t bit_arr_len = bit_array->length;
+    size_t buffer_written = 0;
+    const huffman_node* path = root;
+
+    for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
+    {
+        bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
+        path = huffman_node_traverse(path, bit);
+
+        if (path == NULL)
+            break;
+
+        if (path->is_branching)
+            continue;
+
+        if (buffer_written >= buffer_size - 1)
+            break;
+
+        buffer[buffer_written++] = path->type.leaf.val;
+        path = root;
+    }
+
+    buffer[buffer_written] = '\0';
+
+    return buffer_written;
+}
+
 void
 doublyll_clean(
     dlinked_list_node* root
@@ -161,7 +223,9 @@ compare_symbol_(
 
 
 dlinked_list_node*
-doublyll_create_()
+doublyll_create_(
+    void
+)
 {
     dlinked_list_node* node = malloc(sizeof(dlinked_list_node));
 
