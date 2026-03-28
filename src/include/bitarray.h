@@ -3,6 +3,7 @@
 
 #include <vector.h>
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -23,6 +24,9 @@ void bitarray_clean(bitarray* bitarray);
 bool bitarray_append_bit(bitarray* bitarray, bool value);
 
 int bitarray_value_at(const bitarray* bitarray, bitarray_length_t index);
+
+int64_t bitarray_read_file(bitarray* bitarray, FILE* fp, int64_t bit_count);
+int64_t bitarray_write_file(bitarray* bitarray, FILE* fp, int64_t bit_count);
 
 
 #endif // !HUFFMAN_HUFFMAN_BITARRAY_H

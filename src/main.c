@@ -6,6 +6,7 @@
 #include "huffman_node.h"
 #include "huffman_processing.h"
 #include "bitarray.h"
+#include "io.h"
 
 static const uint8_t* test_text = u8"this is an example of a huffman tree";
 // static const uint8_t* test_text_back = u8"this is an example of a huffman treeloprloprhimnst";
@@ -133,7 +134,7 @@ int main(void)
             bitarray_append_bit(&my_bitarr, path[path_len]);
     }
 
-    const int byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
+    int byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
     printf("\nlength: %zu (%d)\n", my_bitarr.length, byte_count);
     printf("bit-array:\n");
     print_bitarr(&my_bitarr);
@@ -150,8 +151,23 @@ int main(void)
         printf("%c", buf[i]);
     puts("|");
 
+    FILE* fp = open_file_write("./bitarray.txt");
+    bitarray_write_file(&my_bitarr, fp, -1);
+    rewind(fp);
+
     bitarray_clean(&my_bitarr);
     huffman_node_clean(&huffman_root);
+
+    bitarray_init(&my_bitarr);
+    bitarray_read_file(&my_bitarr, fp, -1);
+
+    byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
+    printf("\nbitarray (from-file) (%lu | %d):\n", my_bitarr.length, byte_count);
+    print_bitarr(&my_bitarr);
+    puts("");
+
+    bitarray_clean(&my_bitarr);
+    close_file(fp);
 
     return EXIT_SUCCESS;
 }
