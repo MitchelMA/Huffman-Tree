@@ -5,10 +5,11 @@
 // --- LOCAL DEFINITIONS --- //
 
 #define BITS_IN_BYTE_ (8)
+#define BIT_MOST_SIGNIFICANT_ (3)
 #define BIT_COUNT_(T) ( sizeof(T) * BITS_IN_BYTE_ )
-#define REQ_BYTE_COUNT_(B) ( B / BIT_COUNT_(uint8_t) + (( B % BIT_COUNT_(uint8_t)) > 0) )
+#define REQ_BYTE_COUNT_(B) ( ((B) >> BIT_MOST_SIGNIFICANT_) + (((B) & (BITS_IN_BYTE_ - 1)) > 0) )
 
-static bitarray_bitcontainer_t empty_container = 0;
+static bitarray_bitcontainer_t empty_container_ = 0;
 
 static bitarray_length_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
 static bitarray_length_t bitarray_read_sizeheader_(FILE* fp);
@@ -50,21 +51,19 @@ bitarray_append_bit(
 {
     const bitarray_length_t written = bitarray->length;
     const bitarray_length_t incremental = written + 1;
-    const bitarray_length_t containers_required =
-        (incremental) / BIT_COUNT_(bitarray_bitcontainer_t) + 
-        (((incremental) % BIT_COUNT_(bitarray_bitcontainer_t)) > 0);
+    const bitarray_length_t containers_required = REQ_BYTE_COUNT_(incremental);
     const bitarray_length_t containers_current = vector_get_elem_count(bitarray->content);
 
     if (containers_required > containers_current)
-        vector_append(bitarray->content, &empty_container);
+        vector_append(bitarray->content, &empty_container_);
 
     bitarray_bitcontainer_t to_be_written = value;
 
     const bitarray_length_t container_idx =
-        written / BIT_COUNT_(bitarray_bitcontainer_t);
+        written >> BIT_MOST_SIGNIFICANT_;
 
     const bitarray_bitcontainer_t container_writing_offset =
-        (BIT_COUNT_(bitarray_bitcontainer_t) - (written % BIT_COUNT_(bitarray_bitcontainer_t))) - 1;
+        (BITS_IN_BYTE_ - 1) - (written & (BITS_IN_BYTE_ - 1));
 
     to_be_written <<= container_writing_offset;
 
@@ -86,12 +85,9 @@ bitarray_value_at(
     if (index >= bitarray->length)
         return -1;
 
-    // Determine the container index and
-    // the bit index
-    const bitarray_length_t container_index = index / BIT_COUNT_(bitarray_bitcontainer_t);
-    const bitarray_length_t bit_index =
-        BIT_COUNT_(bitarray_bitcontainer_t) -
-        (index % BIT_COUNT_(bitarray_bitcontainer_t)) - 1;
+    // Determine the container index and the bit index
+    const bitarray_length_t container_index = index >> BIT_MOST_SIGNIFICANT_;
+    const bitarray_length_t bit_index = (BITS_IN_BYTE_ - 1) - (index & (BITS_IN_BYTE_ - 1));
     
     // Then read from the vector to retreive the container
     bitarray_bitcontainer_t* container = NULL;
