@@ -1,7 +1,7 @@
-{ pkgs ? import <nixpkgs> {} }:
+with import <nixpkgs> { };
 
 pkgs.mkShell {
-  name = "SheduleOneCalculator";
+  name = "Huffman Coding";
   nativeBuildInputs = with pkgs; [
     clang
     cmake
