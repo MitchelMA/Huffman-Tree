@@ -87,6 +87,25 @@ void print_bitarr(const bitarray* bitarray)
 
 int main(void)
 {
+    const char* filename = "./test.txt";
+    FILE* fp = open_file_read(filename);
+
+    dlinked_list_node* counted_nodes = huffman_count_stream_onepass(fp);
+    close_file(fp);
+
+    doublyll_print(counted_nodes);
+
+    huffman_node tree_root = huffman_construct_tree(counted_nodes);
+    huffman_node_print_depth(&tree_root);
+    puts("");
+
+    huffman_node_clean(&tree_root);
+
+    return EXIT_SUCCESS;
+}
+
+int main3(void)
+{
     const size_t text_length = strlen((char*)test_text);
     printf("Text: (%lu)\n%s\n", text_length, test_text);
 

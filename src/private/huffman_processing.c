@@ -10,12 +10,21 @@
 static int compare_symbol_(const void* a, const void* b);
 
 static dlinked_list_node* doublyll_create_(void);
+
 static dlinked_list_node* doublyll_get_head_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_get_tail_(dlinked_list_node* node);
+
 static dlinked_list_node* doublyll_insert_before_(dlinked_list_node* target, dlinked_list_node* inserted);
 static dlinked_list_node* doublyll_insert_after_(dlinked_list_node* target, dlinked_list_node* inserted);
+static dlinked_list_node* doublyll_remove_(dlinked_list_node* removed);
+
+static dlinked_list_node* doublyll_reinsert_before_(dlinked_list_node* target, dlinked_list_node* inserted);
+static dlinked_list_node* doublyll_reinsert_after_(dlinked_list_node* target, dlinked_list_node* inserted);
+
 static size_t doublyll_get_length_(dlinked_list_node* node);
+
 static dlinked_list_node* doublyll_insert_leaf_oncount_(dlinked_list_node* root, const huffman_node* entry);
+static dlinked_list_node* doublyll_insert_or_update_(dlinked_list_node* root, uint8_t symbol);
 
 static uint8_t* calculate_consecutive_(uint8_t* start, uint8_t* last, huffman_node* output);
 
@@ -63,6 +72,31 @@ huffman_count_text(
 
     list_root = doublyll_get_head_(list_root);
 
+    return list_root;
+}
+
+dlinked_list_node*
+huffman_count_stream_onepass(
+    FILE* stream
+)
+{
+    int symbol = fgetc(stream);
+
+    if (symbol == EOF)
+        return NULL;
+
+    dlinked_list_node* list_root = doublyll_create_();
+    huffman_node_init_leaf(&list_root->node, (uint8_t)symbol, 1);
+
+    while ((symbol = fgetc(stream)) != EOF)
+    {
+        if (doublyll_insert_or_update_(list_root, (uint8_t)symbol) == NULL)
+            break;
+
+        list_root = doublyll_get_head_(list_root);
+    }
+
+    doublyll_get_head_(list_root);
     return list_root;
 }
 
@@ -296,6 +330,61 @@ doublyll_insert_after_(
     return inserted;
 }
 
+dlinked_list_node*
+doublyll_remove_(
+    dlinked_list_node* removed
+)
+{
+    if (removed == NULL)
+        return NULL;
+
+    dlinked_list_node* old_prev = removed->prev;
+    dlinked_list_node* old_next = removed->next;
+    removed->prev = NULL;
+    removed->next = NULL;
+
+    if (old_prev != NULL)
+        old_prev->next = old_next;
+    if (old_next != NULL)
+        old_next->prev = old_prev;
+
+    return removed;
+}
+
+dlinked_list_node*
+doublyll_reinsert_before_(
+    dlinked_list_node* target,
+    dlinked_list_node* inserted
+)
+{
+    if (target == inserted)
+        return NULL;
+
+    // First check if target actually exists
+    if (target == NULL || inserted == NULL)
+        return NULL;
+
+    // Remove the target from the list and reinsert before the target
+    return doublyll_insert_before_(target, doublyll_remove_(inserted));
+}
+
+dlinked_list_node*
+doublyll_reinsert_after_(
+    dlinked_list_node* target,
+    dlinked_list_node* inserted
+)
+{
+    if (target == inserted)
+        return NULL;
+
+    // First check if target actually exists
+    if (target == NULL || inserted == NULL)
+        return NULL;
+
+    // Remove the target from the list and reinsert after the target
+    return doublyll_insert_after_(target, doublyll_remove_(inserted));
+}
+
 size_t
 doublyll_get_length_(
     dlinked_list_node* node
@@ -351,6 +440,60 @@ doublyll_insert_leaf_oncount_(
         doublyll_insert_after_(current, new_entry_node);
 
     return new_entry_node;
+}
+
+dlinked_list_node*
+doublyll_insert_or_update_(
+    dlinked_list_node* root,
+    uint8_t symbol
+)
+{
+    dlinked_list_node* target = root;
+    dlinked_list_node* previous = target;
+
+    // First search if this symbol already exists in the list
+    while (target != NULL)
+    {
+        if (target->node.type.leaf.val == symbol)
+            break;
+
+        previous = target;
+        target = target->next;
+    }
+
+    // If not, create a new one
+    if (target == NULL)
+    {
+        target = doublyll_create_();
+        huffman_node_init_leaf(&target->node, symbol, 0);
+
+        // Append the target at the end of the linked list
+        previous->next = target;
+        target->prev = previous;
+    }
+
+    target->node.type.leaf.count++;
+
+    // Find the place where we should *actually* insert the newly created/updated node
+    dlinked_list_node* newly = target;
+    target = target->prev;
+
+    // When 'newly' was already the root of the linked-list
+    if (target == NULL)
+        return newly;
+
+    // Find the insert place
+    while (target != NULL && target->prev != NULL &&
+        huffman_node_compare(&newly->node, &target->node) > 0)
+        target = target->prev;
+
+    // Insert before or after the target depending on the comparison
+    if (huffman_node_compare(&newly->node, &target->node) > 0)
+        doublyll_reinsert_before_(target, newly);
+    else
+        doublyll_reinsert_after_(target, newly);
+
+    return newly;
 }
 
 uint8_t*

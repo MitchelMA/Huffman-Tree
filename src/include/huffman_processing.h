@@ -2,6 +2,7 @@
 #define HUFFMAN_HUFFMAN_PROCESSING_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 #include "huffman_node.h"
 #include "bitarray.h"
@@ -20,6 +21,13 @@ typedef struct dlinked_list_node_ {
  * symbol.
  */
 dlinked_list_node* huffman_count_text(const uint8_t* text, int64_t length);
+
+/**
+ * Couts the symbols from the stream, and creates
+ * a doubly-linked-list containing unique huffman_node leafs
+ * with a value and count for each found individual symbol.
+ */
+dlinked_list_node* huffman_count_stream_onepass(FILE* stream);
 
 /**
  * Constructs the tree
