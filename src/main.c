@@ -91,7 +91,7 @@ int main(void)
     FILE* fp = open_file_read(filename);
 
     dlinked_list_node* counted_nodes = huffman_count_stream_onepass(fp);
-    close_file(fp);
+    rewind(fp);
 
     doublyll_print(counted_nodes);
 
@@ -99,7 +99,22 @@ int main(void)
     huffman_node_print_depth(&tree_root);
     puts("");
 
+    bitarray arr = {0};
+    bitarray_init(&arr);
+    huffman_compress_stream(&tree_root, fp, &arr);
+    rewind(fp);
+
+    print_bitarr(&arr);
+    puts("");
+
+    fp = reopen_file_write(fp);
+    const size_t written = huffman_decompress_stream(&tree_root, &arr, fp);
+
+    printf("Written into stream: %zu\n", written);
+
     huffman_node_clean(&tree_root);
+    bitarray_clean(&arr);
+    close_file(fp);
 
     return EXIT_SUCCESS;
 }
@@ -112,7 +127,10 @@ int main3(void)
     dlinked_list_node* list_root = huffman_count_text(test_text, text_length);
     huffman_node huffman_root = huffman_construct_tree(list_root);
 
-    bitarray my_bitarr = huffman_compress(&huffman_root, text_length, test_text);
+    bitarray my_bitarr = {0};
+    bitarray_init(&my_bitarr);
+
+    huffman_compress(&huffman_root, text_length, test_text, &my_bitarr);
     printf("Bitarray: (%li)\n", my_bitarr.length);
     print_bitarr(&my_bitarr);
     puts("");

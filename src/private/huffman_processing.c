@@ -163,28 +163,57 @@ huffman_construct_tree(
     return huffman_root;
 }
 
-bitarray
+bitarray_length_t
 huffman_compress(
     const huffman_node* root,
-    const size_t buffer_size,
-    const uint8_t* buffer
+    size_t buffer_size,
+    const uint8_t* buffer,
+    bitarray* out_bitarray
 )
 {
-    if (root == NULL || buffer == NULL || buffer_size == 0)
-        return (bitarray){0};
+    if (root == NULL || buffer == NULL || buffer_size == 0 || out_bitarray == NULL)
+        return 0;
 
-    bitarray bit_array = {0};
-    bitarray_init(&bit_array);
-
+    bitarray_length_t processed = 0;
     for (size_t idx = 0; idx < buffer_size; idx++)
     {
         int64_t path_len = 0;
         bool* path = huffman_node_path(root, buffer[idx], &path_len);
         while (path_len-- > 0)
-            bitarray_append_bit(&bit_array, path[path_len]);
+        {
+            bitarray_append_bit(out_bitarray, path[path_len]);
+            processed++;
+        }
     }
 
-    return bit_array;
+    return processed;
+}
+
+bitarray_length_t
+huffman_compress_stream(
+    const huffman_node* root,
+    FILE* in_stream,
+    bitarray* out_bitarray
+)
+{
+    if (root == NULL || in_stream == NULL || out_bitarray == NULL)
+        return 0;
+
+    bitarray_length_t processed = 0;
+    int symbol = EOF;
+
+    while ((symbol = fgetc(in_stream)) != EOF)
+    {
+        int64_t path_len = 0;
+        bool* path = huffman_node_path(root, (uint8_t)symbol, &path_len);
+        while (path_len-- > 0)
+        {
+            bitarray_append_bit(out_bitarray, path[path_len]);
+            processed++;
+        }
+    }
+
+    return processed;
 }
 
 size_t
@@ -225,6 +254,41 @@ huffman_decompress(
     return buffer_written;
 }
 
+size_t
+huffman_decompress_stream(
+    const huffman_node* root,
+    const bitarray* bit_array,
+    FILE* out_stream
+)
+{
+    if (root == NULL || bit_array == NULL || out_stream == NULL)
+        return 0;
+
+    const bitarray_length_t bit_arr_len = bit_array->length;
+    size_t stream_written = 0;
+    const huffman_node* path = root;
+
+    for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
+    {
+        bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
+        path = huffman_node_traverse(path, bit);
+
+        if (path == NULL)
+            break;
+
+        if (path->is_branching)
+            continue;
+
+        if (fputc(path->type.leaf.val, out_stream) == EOF)
+            break;
+
+        stream_written++;
+        path = root;
+    }
+
+    return stream_written;
+}
+
 void
 doublyll_clean(
     dlinked_list_node* root
@@ -254,7 +318,6 @@ compare_symbol_(
 {
     return *(uint8_t*)a - *(uint8_t*)b;
 }
-
 
 dlinked_list_node*
 doublyll_create_(
