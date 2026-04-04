@@ -6,7 +6,8 @@ add_executable(HuffmanTree
 
 target_link_libraries(HuffmanTree
     PUBLIC
-    CVector)
+    CVector
+    $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:asan ubsan>)
 
 target_compile_options(HuffmanTree
     PUBLIC
