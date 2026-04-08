@@ -87,29 +87,35 @@ void print_bitarr(const bitarray* bitarray)
 
 int main(void)
 {
-    const char* filename = "./test.txt";
+    const char* filename = "./input";
     FILE* fp = open_file_read(filename);
+    puts("Opened file");
 
     dlinked_list_node* counted_nodes = huffman_count_stream_onepass(fp);
     rewind(fp);
+    puts("Parsed file");
 
     doublyll_print(counted_nodes);
 
     huffman_node tree_root = huffman_construct_tree(counted_nodes);
+    puts("Constructed tree");
     huffman_node_print_depth(&tree_root);
     puts("");
 
     bitarray arr = {0};
     bitarray_init(&arr);
     huffman_compress_stream(&tree_root, fp, &arr);
-    rewind(fp);
+    puts("Compressed file");
+    printf("compressed-length: %zu\n", (arr.length >> 3) + 1);
+    close_file(fp);
 
     print_bitarr(&arr);
     puts("");
 
-    fp = reopen_file_write(fp);
+    fp = open_file_write("./output");
     const size_t written = huffman_decompress_stream(&tree_root, &arr, fp);
 
+    puts("Decompressed bitarray");
     printf("Written into stream: %zu\n", written);
 
     huffman_node_clean(&tree_root);

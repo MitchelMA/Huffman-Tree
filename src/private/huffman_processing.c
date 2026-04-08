@@ -107,17 +107,9 @@ huffman_construct_tree(
 {
     while (doublyll_get_length_(root) > 1)
     {
-        root = doublyll_get_head_(root);
-
         dlinked_list_node*    ultimate_node = doublyll_get_tail_(root);
         dlinked_list_node* penultimate_node = ultimate_node->prev;
-        dlinked_list_node* chain_linker = penultimate_node->prev;
 
-        // Disconnect the last two from the linked-list
-        if (chain_linker != NULL)
-            chain_linker->next = NULL;
-
-        penultimate_node->prev = NULL;
         penultimate_node->next = NULL;
         ultimate_node->prev = NULL;
 
@@ -139,22 +131,22 @@ huffman_construct_tree(
             break;
 
         // Find the best fitting reinsert target for the penultimate-node.
-        dlinked_list_node* target = root;
+        dlinked_list_node* target = penultimate_node->prev;
 
-        while (target != NULL && target->next != NULL &&
-               huffman_node_compare(&penultimate_node->node, &target->node) <= 0)
-            target = target->next;
-
-        const int comp = huffman_node_compare(&penultimate_node->node, &target->node);
+        while (target != NULL && target->prev != NULL &&
+               huffman_node_compare(&penultimate_node->node, &target->node) > 0)
+            target = target->prev;
 
         // Insert *before* the target if the 'to be inserted'-node is
         // larger
-        if (comp > 0)
-            doublyll_insert_before_(target, penultimate_node);
+        if (huffman_node_compare(&penultimate_node->node, &target->node) > 0)
+            doublyll_reinsert_before_(target, penultimate_node);
 
         // Otherwise it comes *after*
         else
-            doublyll_insert_after_(target, penultimate_node);
+            doublyll_reinsert_after_(target, penultimate_node);
+
+        root = doublyll_get_head_(root);
     }
 
     huffman_node huffman_root = root->node;
