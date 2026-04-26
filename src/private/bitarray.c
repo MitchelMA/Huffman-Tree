@@ -12,6 +12,11 @@
 #define BIT_REST_COUNT_(BIT_AMOUNT) ( (BIT_AMOUNT) & (BITS_IN_BYTE_ - 1) )
 #define REQ_BYTE_COUNT_(BIT_AMOUNT) ( BYTE_FILLING_COUNT_(BIT_AMOUNT) + (BIT_REST_COUNT_(BIT_AMOUNT) > 0) )
 
+static void bitarray_clean_impl__mem_(bitarray* bitarray);
+static void bitarray_clean_impl__io_(bitarray* bitarray);
+
+static bool bitarray_append_bit_impl__mem_(bitarray* bitarray, bool value);
+
 static bitarray_bitcontainer_t empty_container_ = 0;
 
 static bitarray_length_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
@@ -33,6 +38,35 @@ bitarray_init(
     return bitarray->content != NULL;
 }
 
+bool
+bitarray_init_in_mem(
+    bitarray* bitarray
+)
+{
+    if (bitarray == NULL)
+        return false;
+
+    bitarray->kind = BITARRAY_IN_MEM;
+    bitarray->in_mem.content = vector_create(sizeof(bitarray_bitcontainer_t));
+
+    return bitarray->in_mem.content != NULL;
+}
+
+bool
+bitarray_init_io_buffered(
+    bitarray* bitarray,
+    FILE* fp
+)
+{
+    if (bitarray == NULL || fp == NULL)
+        return false;
+
+    bitarray->kind = BITARRAY_IO_BUFFERED;
+    bitarray->buffered.file = fp;
+
+    return true;
+}
+
 void
 bitarray_clean(
     bitarray* bitarray
@@ -41,9 +75,15 @@ bitarray_clean(
     if (bitarray == NULL)
         return;
 
-    bitarray->length = 0;
-    vector_clean(bitarray->content);
-    bitarray->content = NULL;
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            bitarray_clean_impl__mem_(bitarray);
+        break;
+        case BITARRAY_IO_BUFFERED:
+            bitarray_clean_impl__io_(bitarray);
+        break;
+    }
 }
 
 bool
@@ -52,6 +92,23 @@ bitarray_append_bit(
     bool value
 )
 {
+    if (bitarray == NULL)
+        return false;
+
+    bool ret = false;
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            ret = bitarray_append_bit_impl__mem_(bitarray, value);
+        break;
+        case BITARRAY_IO_BUFFERED:
+        break;
+        default:
+    }
+
+    return ret;
+
     const bitarray_length_t written = bitarray->length;
     const bitarray_length_t incremental = written + 1;
     const bitarray_length_t containers_required = REQ_BYTE_COUNT_(incremental);
@@ -161,6 +218,54 @@ bitarray_write_file(
 }
 
 // --- LOCAL IMPLEMENTATIONS --- //
+
+
+void
+bitarray_clean_impl__mem_(
+    bitarray* bitarray
+)
+{
+    bitarray->in_mem.bit_offset = 0;
+    vector_clean(bitarray->in_mem.content);
+    bitarray->in_mem.content = NULL;
+}
+
+
+void
+bitarray_clean_impl__io_(
+    bitarray* bitarray
+)
+{
+    bitarray->buffered.io_buffer = 0;
+    fclose(bitarray->buffered.file);
+    bitarray->buffered.file = NULL;
+}
+
+
+bool
+bitarray_append_bit_impl__mem_(
+    bitarray* bitarray,
+    bool value
+)
+{
+    // Check wether a new container needs to be allocated
+    if (bitarray->in_mem.bit_offset == 0)
+        vector_append(bitarray->in_mem.content, &empty_container_);
+
+    // Retreive the container where the bit is going to be written into
+    bitarray_bitcontainer_t* container = NULL;
+    if (!vector_elem_at(
+        bitarray->in_mem.content,
+        vector_get_elem_count(bitarray->in_mem.content) - 1,
+        (void**)&container))
+        return false;
+
+    // Write the value offset into the container
+    bitarray_bitcontainer_t to_be_written = value << bitarray->in_mem.bit_offset;
+    *container |= to_be_written;
+    bitarray->in_mem.bit_offset = BIT_REST_COUNT_(bitarray->in_mem.bit_offset + 1);
+    return true;
+}
 
 bitarray_length_t
 bitarray_write_sizeheader_(

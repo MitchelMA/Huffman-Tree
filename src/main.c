@@ -103,7 +103,8 @@ int main(void)
     puts("");
 
     bitarray arr = {0};
-    bitarray_init(&arr);
+    bitarray_init_in_mem(&arr);
+    // bitarray_init(&arr);
     huffman_compress_stream(&tree_root, fp, &arr);
     puts("Compressed file");
     printf("compressed-length: %zu\n", (arr.length >> 3) + 1);
