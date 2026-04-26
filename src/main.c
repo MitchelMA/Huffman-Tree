@@ -119,7 +119,6 @@ int main(void)
 
     fp = open_file_write("./output");
     const size_t written = huffman_decompress_stream(&tree_root, &arr, fp);
-
     puts("Decompressed bitarray");
     printf("Written into stream: %zu\n", written);
 

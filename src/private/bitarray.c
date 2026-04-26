@@ -21,10 +21,13 @@ static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_lengt
 
 static bitarray_length_t bitarray_length_impl__mem_(const bitarray* bitarray);
 
+static int64_t bitarray_read_file_impl__mem_(bitarray* bitarray, FILE* fp, int64_t bit_count);
+static int64_t bitarray_write_file_impl__mem_(bitarray* bitarray, FILE* fp, int64_t bit_count);
+
 static bitarray_bitcontainer_t empty_container_ = 0;
 
-static bitarray_length_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
-static bitarray_length_t bitarray_read_sizeheader_(FILE* fp);
+static bitarray_length_t bitarray_write_sizeheader__mem_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
+static bitarray_length_t bitarray_read_sizeheader__mem_(FILE* fp);
 
 // --- END LOCAL DEFINITIONS --- //
 
@@ -136,21 +139,6 @@ bitarray_value_at(
     }
 
     return ret;
-
-    if (index >= bitarray->length)
-        return -1;
-
-    // Determine the container index and the bit index
-    const bitarray_length_t container_index = BYTE_FILLING_COUNT_(index);
-    const bitarray_length_t bit_index = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(index);
-    
-    // Then read from the vector to retreive the container
-    bitarray_bitcontainer_t* container = NULL;
-    if (!vector_elem_at(bitarray->in_mem.content, container_index, (void**)&container))
-        return -1;
-
-    // Shift the container and read the value at the right-most bit
-    return ((*container) >> bit_index) & 1;
 }
 
 bitarray_length_t
@@ -183,34 +171,25 @@ bitarray_read_file(
     int64_t bit_count
 )
 {
+    int64_t ret = -1;
+
     if (bitarray == NULL || fp == NULL)
-        return -1;
+        return ret;
 
     if (bit_count == -1)
         bit_count = INT64_MAX;
 
-    int read_value = EOF;
-    bitarray_length_t read_amount = 0;
-
-    bitarray_length_t max_bit_count = bitarray_read_sizeheader_(fp);
-    max_bit_count = max_bit_count > (bitarray_length_t)bit_count
-        ? bit_count
-        : max_bit_count;
-
-    const bitarray_length_t max_byte_count = REQ_BYTE_COUNT_(max_bit_count);
-
-    while (read_amount < max_byte_count && (read_value = getc(fp)) != EOF)
+    switch (bitarray->kind)
     {
-        read_amount++;
-        bitarray_bitcontainer_t insert_value = (bitarray_bitcontainer_t)read_value;
-        vector_append(bitarray->content, (void*)&insert_value);
-        bitarray->length += BIT_COUNT_(bitarray_bitcontainer_t);
+        case BITARRAY_IN_MEM:
+            ret = bitarray_read_file_impl__mem_(bitarray, fp, bit_count);
+        break;
+        case BITARRAY_IO_BUFFERED:
+        break;
+        default:
     }
 
-    if (bitarray->length > max_bit_count)
-        bitarray->length = max_bit_count;
-
-    return read_amount;
+    return ret;
 }
 
 int64_t
@@ -220,22 +199,25 @@ bitarray_write_file(
     int64_t bit_count
 )
 {
+    int64_t ret = -1;
+
     if (bitarray == NULL || fp == NULL)
-        return -1;
+        return ret;
 
     if (bit_count == -1)
         bit_count = INT64_MAX;
 
-    const bitarray_length_t container_bit_count = bitarray->length;
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            ret = bitarray_write_file_impl__mem_(bitarray, fp, bit_count);
+        break;
+        case BITARRAY_IO_BUFFERED:
+        break;
+        default:
+    }
 
-    if (bit_count == -1 || (bitarray_length_t)bit_count > container_bit_count)
-        bit_count = (int64_t)container_bit_count;
-
-    const bitarray_length_t byte_count = REQ_BYTE_COUNT_(bit_count);
-    const bitarray_bitcontainer_t* buffer = vector_get_start_addr_(bitarray->content);
-
-    bitarray_write_sizeheader_(bitarray, fp, bit_count);
-    return (int64_t) fwrite(buffer, sizeof(uint8_t), byte_count, fp);
+    return ret;
 }
 
 // --- LOCAL IMPLEMENTATIONS --- //
@@ -324,8 +306,57 @@ bitarray_length_impl__mem_(
         );
 }
 
+int64_t
+bitarray_read_file_impl__mem_(
+    bitarray* bitarray,
+    FILE* fp,
+    int64_t bit_count
+)
+{
+    int read_value = EOF;
+    bitarray_length_t read_amount = 0;
+
+    bitarray_length_t max_bit_count = bitarray_read_sizeheader__mem_(fp);
+    max_bit_count = max_bit_count > (bitarray_length_t)bit_count
+        ? bit_count
+        : max_bit_count;
+
+    const bitarray_length_t max_byte_count = REQ_BYTE_COUNT_(max_bit_count);
+
+    while (read_amount < max_byte_count && (read_value = getc(fp)) != EOF)
+    {
+        read_amount++;
+        bitarray_bitcontainer_t insert_value = (bitarray_bitcontainer_t)read_value;
+        vector_append(bitarray->in_mem.content, (void*)&insert_value);
+    }
+
+    bitarray->in_mem.bit_offset = BIT_REST_COUNT_(max_bit_count);
+
+    return read_amount;
+}
+
+int64_t
+bitarray_write_file_impl__mem_(
+    bitarray* bitarray,
+    FILE* fp,
+    int64_t bit_count
+)
+{
+    const bitarray_length_t container_bit_count = bitarray_length_impl__mem_(bitarray);
+
+    if (bit_count == -1 || (bitarray_length_t)bit_count > container_bit_count)
+        bit_count = (int64_t)container_bit_count;
+
+    const bitarray_length_t byte_count = REQ_BYTE_COUNT_(bit_count);
+    const bitarray_bitcontainer_t* buffer = vector_get_start_addr_(bitarray->in_mem.content);
+
+    bitarray_write_sizeheader__mem_(bitarray, fp, bit_count);
+    return (int64_t) fwrite(buffer, sizeof(uint8_t), byte_count, fp);
+}
+
+
 bitarray_length_t
-bitarray_write_sizeheader_(
+bitarray_write_sizeheader__mem_(
     const bitarray* bitarray,
     FILE* fp,
     int64_t max_bit_count
@@ -336,9 +367,9 @@ bitarray_write_sizeheader_(
     if (max_bit_count == -1)
         max_bit_count = INT64_MAX;
 
-    const bitarray_length_t bit_count = bitarray->length > (bitarray_length_t)max_bit_count ?
+    const bitarray_length_t bit_count = bitarray_length_impl__mem_(bitarray) > (bitarray_length_t)max_bit_count ?
         max_bit_count
-        : bitarray->length;
+        : bitarray_length_impl__mem_(bitarray);
 
     if (fwrite(&bit_count, sizeof(bitarray_length_t), item_write_count, fp) < item_write_count)
         return 0;
@@ -347,7 +378,7 @@ bitarray_write_sizeheader_(
 }
 
 bitarray_length_t
-bitarray_read_sizeheader_(
+bitarray_read_sizeheader__mem_(
     FILE* fp
 )
 {
