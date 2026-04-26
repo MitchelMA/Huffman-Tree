@@ -17,6 +17,10 @@ static void bitarray_clean_impl__io_(bitarray* bitarray);
 
 static bool bitarray_append_bit_impl__mem_(bitarray* bitarray, bool value);
 
+static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_length_t index);
+
+static bitarray_length_t bitarray_length_impl__mem_(const bitarray* bitarray);
+
 static bitarray_bitcontainer_t empty_container_ = 0;
 
 static bitarray_length_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
@@ -108,29 +112,6 @@ bitarray_append_bit(
     }
 
     return ret;
-
-    const bitarray_length_t written = bitarray->length;
-    const bitarray_length_t incremental = written + 1;
-    const bitarray_length_t containers_required = REQ_BYTE_COUNT_(incremental);
-    const bitarray_length_t containers_current = vector_get_elem_count(bitarray->content);
-
-    if (containers_required > containers_current)
-        vector_append(bitarray->content, &empty_container_);
-
-    bitarray_bitcontainer_t to_be_written = value;
-
-    const bitarray_length_t container_idx = BYTE_FILLING_COUNT_(written);
-    const bitarray_bitcontainer_t container_writing_offset = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(written);
-
-    to_be_written <<= container_writing_offset;
-
-    bitarray_bitcontainer_t* indexed_container = NULL;
-    if (!vector_elem_at(bitarray->content, container_idx, (void**)&indexed_container))
-        return false;
-
-    *indexed_container |= to_be_written;
-    bitarray->length = incremental;
-    return true;
 }
 
 int
@@ -139,6 +120,23 @@ bitarray_value_at(
     bitarray_length_t index
 )
 {
+    int ret = -1;
+
+    if (bitarray == NULL)
+        return ret;
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            ret = bitarray_value_at_impl__mem_(bitarray, index);
+        break;
+        case BITARRAY_IO_BUFFERED:
+        break;
+        default:
+    }
+
+    return ret;
+
     if (index >= bitarray->length)
         return -1;
 
@@ -148,11 +146,34 @@ bitarray_value_at(
     
     // Then read from the vector to retreive the container
     bitarray_bitcontainer_t* container = NULL;
-    if (!vector_elem_at(bitarray->content, container_index, (void**)&container))
+    if (!vector_elem_at(bitarray->in_mem.content, container_index, (void**)&container))
         return -1;
 
     // Shift the container and read the value at the right-most bit
     return ((*container) >> bit_index) & 1;
+}
+
+bitarray_length_t
+bitarray_length(
+    const bitarray* bitarray
+)
+{
+    bitarray_length_t ret = 0;
+
+    if (bitarray == NULL)
+        return ret;
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            ret = bitarray_length_impl__mem_(bitarray);
+        break;
+        case BITARRAY_IO_BUFFERED:
+        break;
+        default:
+    }
+
+    return ret;
 }
 
 int64_t
@@ -219,7 +240,6 @@ bitarray_write_file(
 
 // --- LOCAL IMPLEMENTATIONS --- //
 
-
 void
 bitarray_clean_impl__mem_(
     bitarray* bitarray
@@ -230,7 +250,6 @@ bitarray_clean_impl__mem_(
     bitarray->in_mem.content = NULL;
 }
 
-
 void
 bitarray_clean_impl__io_(
     bitarray* bitarray
@@ -240,7 +259,6 @@ bitarray_clean_impl__io_(
     fclose(bitarray->buffered.file);
     bitarray->buffered.file = NULL;
 }
-
 
 bool
 bitarray_append_bit_impl__mem_(
@@ -261,10 +279,45 @@ bitarray_append_bit_impl__mem_(
         return false;
 
     // Write the value offset into the container
-    bitarray_bitcontainer_t to_be_written = value << bitarray->in_mem.bit_offset;
+    const bitarray_bitcontainer_t writing_offset = (BITS_IN_BYTE_ - 1) - bitarray->in_mem.bit_offset;
+    const bitarray_bitcontainer_t to_be_written = value << writing_offset;
+
     *container |= to_be_written;
     bitarray->in_mem.bit_offset = BIT_REST_COUNT_(bitarray->in_mem.bit_offset + 1);
+
     return true;
+}
+
+int
+bitarray_value_at_impl__mem_(
+    const bitarray* bitarray,
+    bitarray_length_t index
+)
+{
+    if (index >= bitarray_length_impl__mem_(bitarray))
+        return -1;
+
+    // Determine the container index and the bit index
+    const bitarray_length_t container_index = BYTE_FILLING_COUNT_(index);
+    const bitarray_length_t bit_index = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(index);
+    
+    // Then read from the vector to retreive the container
+    bitarray_bitcontainer_t* container = NULL;
+    if (!vector_elem_at(bitarray->in_mem.content, container_index, (void**)&container))
+        return -1;
+
+    // Shift the container and read the value at the right-most bit
+    return ((*container) >> bit_index) & 1;
+}
+
+
+bitarray_length_t
+bitarray_length_impl__mem_(
+    const bitarray* bitarray
+)
+{
+    return BIT_COUNT_(vector_get_elem_count(bitarray->in_mem.content)) +
+        bitarray->in_mem.bit_offset;
 }
 
 bitarray_length_t

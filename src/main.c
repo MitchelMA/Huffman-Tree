@@ -76,7 +76,8 @@ void print_uncompressed_text(const uint8_t* text)
 
 void print_bitarr(const bitarray* bitarray)
 {
-    for (int64_t i = 0; i < (int64_t)bitarray->length; i++)
+    int64_t length = bitarray_length(bitarray);
+    for (int64_t i = 0; i < length; i++)
     {
         if (i % 8 == 0 && i != 0)
             printf("");
@@ -106,6 +107,11 @@ int main(void)
     bitarray_init_in_mem(&arr);
     // bitarray_init(&arr);
     huffman_compress_stream(&tree_root, fp, &arr);
+
+    print_path(&tree_root, 't');
+    print_bitarr(&arr);
+    puts("");
+
     puts("Compressed file");
     printf("compressed-length: %zu\n", (arr.length >> 3) + 1);
     close_file(fp);
