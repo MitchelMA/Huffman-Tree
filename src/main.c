@@ -105,15 +105,13 @@ int main(void)
 
     bitarray arr = {0};
     bitarray_init_in_mem(&arr);
-    // bitarray_init(&arr);
-    huffman_compress_stream(&tree_root, fp, &arr);
 
-    print_path(&tree_root, 't');
-    print_bitarr(&arr);
-    puts("");
+    const bitarray_length_t processed = huffman_compress_stream(&tree_root, fp, &arr);
+    const bitarray_length_t length = bitarray_length(&arr);
 
-    puts("Compressed file");
-    printf("compressed-length: %zu\n", (arr.length >> 3) + 1);
+    printf("len: %llu\n", length);
+    printf("Compressed file (%llu)\n", processed);
+    printf("compressed-length: %zu\n", (length >> 3) + 1);
     close_file(fp);
 
     print_bitarr(&arr);

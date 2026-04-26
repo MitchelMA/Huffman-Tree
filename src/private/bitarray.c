@@ -316,8 +316,12 @@ bitarray_length_impl__mem_(
     const bitarray* bitarray
 )
 {
-    return BIT_COUNT_(vector_get_elem_count(bitarray->in_mem.content)) +
-        bitarray->in_mem.bit_offset;
+    return BIT_COUNT_(bitarray_bitcontainer_t) *
+        vector_get_elem_count(bitarray->in_mem.content) -
+        (
+            (bitarray->in_mem.bit_offset > 0) *
+            ((BITS_IN_BYTE_) - bitarray->in_mem.bit_offset)
+        );
 }
 
 bitarray_length_t
