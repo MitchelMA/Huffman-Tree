@@ -120,6 +120,7 @@ int main(void)
     bitarray_append_bit(&arr, 0);
     bitarray_append_bit(&arr, 0);
     bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 1);
     print_bitarr(&arr);
 
     huffman_node_clean(&tree_root);

@@ -26,6 +26,7 @@ static bool bitarray_append_bit_impl__io_(bitarray* bitarray, bool value);
 static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_length_t index);
 
 static bitarray_length_t bitarray_length_impl__mem_(const bitarray* bitarray);
+static bitarray_length_t bitarray_length_impl__io_(const bitarray* bitarray);
 
 static void bitarray_flush_impl__io_(bitarray* bitarray);
 static int64_t bitarray_read_file_impl__mem_(bitarray* bitarray, FILE* fp, int64_t bit_count);
@@ -35,6 +36,11 @@ static bitarray_bitcontainer_t empty_container_ = 0;
 
 static bitarray_length_t bitarray_write_sizeheader__mem_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
 static bitarray_length_t bitarray_read_sizeheader__mem_(FILE* fp);
+
+static long stream_towards_(FILE* fp, long offset, int whence);
+static long stream_begin_(FILE* fp);
+static long stream_end_(FILE* fp);
+static long stream_tell_size_(FILE* fp);
 
 // --- END LOCAL DEFINITIONS --- //
 
@@ -173,7 +179,7 @@ bitarray_length(
             ret = bitarray_length_impl__mem_(bitarray);
         break;
         case BITARRAY_IO_BUFFERED:
-            TODO("length not implemented for IO_BUFFERED yet");
+            ret = bitarray_length_impl__io_(bitarray);
         break;
         default:
             SWITCH_EXHAUST_DEFAULT;
@@ -372,6 +378,19 @@ bitarray_length_impl__mem_(
         );
 }
 
+bitarray_length_t
+bitarray_length_impl__io_(
+    const bitarray* bitarray
+)
+{
+    const long stream_size = stream_tell_size_(bitarray->buffered.file);
+
+    if (stream_size < 0)
+        return 0;
+
+    return stream_size * 8 + bitarray->buffered.bit_offset;
+}
+
 void
 bitarray_flush_impl__io_(
     bitarray* bitarray
@@ -468,6 +487,52 @@ bitarray_read_sizeheader__mem_(
         return 0;
 
     return bit_count;
+}
+
+long
+stream_towards_(
+    FILE* fp,
+    const long offset,
+    const int whence
+)
+{
+    const long current_pos = ftell(fp);
+
+    if (fseek(fp, offset, whence))
+        return -1;
+
+    return current_pos;
+}
+
+long
+stream_begin_(
+    FILE* fp
+)
+{
+    return stream_towards_(fp, 0, SEEK_SET);
+}
+
+long
+stream_end_(
+    FILE* fp
+)
+{
+    return stream_towards_(fp, 0, SEEK_END);
+}
+
+long
+stream_tell_size_(
+    FILE* fp
+)
+{
+    const long initial = stream_end_(fp);
+
+    // Failure in moving to end of stream
+    if (initial < 0)
+        return initial;
+
+    // Restore initial position and return the position at the end (length)
+    return stream_towards_(fp, initial, SEEK_SET);
 }
 
 // --- END LOCAL IMPLEMENTATIONS --- //
