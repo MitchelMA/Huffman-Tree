@@ -88,6 +88,42 @@ void print_bitarr(const bitarray* bitarray)
 
 int main(void)
 {
+    huffman_node tree_root = {0};
+    bitarray arr = {0};
+    const char* text_filename;
+    const char* buff_filename;
+    FILE* text_fp    = NULL;
+    FILE* bitarr_buf = NULL;
+
+    text_filename = "./input";
+    buff_filename = "./bitarr_buff";
+    text_fp  = open_file_read(text_filename);
+    puts("Opened text file");
+
+    dlinked_list_node* counted_nodes = huffman_count_stream_onepass(text_fp);
+    rewind(text_fp);
+    puts("Parsed for symbol-count:");
+    doublyll_print(counted_nodes);
+
+    tree_root = huffman_construct_tree(counted_nodes);
+    puts("Constructed tree");
+    huffman_node_print_depth(&tree_root);
+    puts("");
+
+    bitarr_buf = open_file_write(buff_filename);
+    bitarray_init_io_buffered(&arr, bitarr_buf);
+    bitarray_append_bit(&arr, 1);
+    print_bitarr(&arr);
+
+    huffman_node_clean(&tree_root);
+    close_file(text_fp);
+    bitarray_clean(&arr);
+
+    return EXIT_SUCCESS;
+}
+
+int main4(void)
+{
     const char* filename = "./input";
     FILE* fp = open_file_read(filename);
     puts("Opened file");
@@ -109,9 +145,8 @@ int main(void)
     const bitarray_length_t processed = huffman_compress_stream(&tree_root, fp, &arr);
     const bitarray_length_t length = bitarray_length(&arr);
 
-    printf("len: %llu\n", length);
-    printf("Compressed file (%llu)\n", processed);
-    printf("compressed-length: %zu\n", (length >> 3) + 1);
+    printf("Compressed file (%llu bits)\n", processed);
+    printf("compressed-length: %zu bytes\n", (length >> 3) + 1);
     close_file(fp);
 
     print_bitarr(&arr);
@@ -120,7 +155,8 @@ int main(void)
     fp = open_file_write("./output");
     const size_t written = huffman_decompress_stream(&tree_root, &arr, fp);
     puts("Decompressed bitarray");
-    printf("Written into stream: %zu\n", written);
+    printf("Written into stream: %zu bytes\n", written);
+    printf("Reached compression-ratio of: %0.1f%%\n", (int64_t)(length - (written * 8)) / (float)(written * 8) * 100 );
 
     huffman_node_clean(&tree_root);
     bitarray_clean(&arr);

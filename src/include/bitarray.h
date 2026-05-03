@@ -52,6 +52,7 @@ int bitarray_value_at(const bitarray* bitarray, bitarray_length_t index);
 
 bitarray_length_t bitarray_length(const bitarray* bitarray);
 
+void bitarray_flush(bitarray* bitarray);
 int64_t bitarray_read_file(bitarray* bitarray, FILE* fp, int64_t bit_count);
 int64_t bitarray_write_file(bitarray* bitarray, FILE* fp, int64_t bit_count);
 

@@ -1,6 +1,7 @@
 #include "bitarray.h"
 
 #include <stdio.h>
+#include <assert.h>
 
 // --- LOCAL DEFINITIONS --- //
 
@@ -12,6 +13,10 @@
 #define BIT_REST_COUNT_(BIT_AMOUNT) ( (BIT_AMOUNT) & (BITS_IN_BYTE_ - 1) )
 #define REQ_BYTE_COUNT_(BIT_AMOUNT) ( BYTE_FILLING_COUNT_(BIT_AMOUNT) + (BIT_REST_COUNT_(BIT_AMOUNT) > 0) )
 
+#define FAIL_ASSERT(MSG) assert(0 && MSG)
+#define SWITCH_EXHAUST_DEFAULT FAIL_ASSERT("This case should not be reached: the bitarray is of unkown kind")
+#define TODO(MSG) FAIL_ASSERT(MSG)
+
 static void bitarray_clean_impl__mem_(bitarray* bitarray);
 static void bitarray_clean_impl__io_(bitarray* bitarray);
 
@@ -21,6 +26,7 @@ static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_lengt
 
 static bitarray_length_t bitarray_length_impl__mem_(const bitarray* bitarray);
 
+static void bitarray_flush_impl__io_(bitarray* bitarray);
 static int64_t bitarray_read_file_impl__mem_(bitarray* bitarray, FILE* fp, int64_t bit_count);
 static int64_t bitarray_write_file_impl__mem_(bitarray* bitarray, FILE* fp, int64_t bit_count);
 
@@ -90,6 +96,9 @@ bitarray_clean(
         case BITARRAY_IO_BUFFERED:
             bitarray_clean_impl__io_(bitarray);
         break;
+        default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
     }
 }
 
@@ -110,8 +119,11 @@ bitarray_append_bit(
             ret = bitarray_append_bit_impl__mem_(bitarray, value);
         break;
         case BITARRAY_IO_BUFFERED:
+            TODO("append_bit not implemented for IO_BUFFERED yet");
         break;
         default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
     }
 
     return ret;
@@ -134,8 +146,11 @@ bitarray_value_at(
             ret = bitarray_value_at_impl__mem_(bitarray, index);
         break;
         case BITARRAY_IO_BUFFERED:
+            TODO("value_at not implemented for IO_BUFFERED yet");
         break;
         default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
     }
 
     return ret;
@@ -157,11 +172,35 @@ bitarray_length(
             ret = bitarray_length_impl__mem_(bitarray);
         break;
         case BITARRAY_IO_BUFFERED:
+            TODO("length not implemented for IO_BUFFERED yet");
         break;
         default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
     }
 
     return ret;
+}
+
+void
+bitarray_flush(
+    bitarray* bitarray
+)
+{
+    if (bitarray == NULL)
+        return;
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+        break;
+        case BITARRAY_IO_BUFFERED:
+            bitarray_flush_impl__io_(bitarray);
+        break;
+        default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
+    }
 }
 
 int64_t
@@ -185,8 +224,11 @@ bitarray_read_file(
             ret = bitarray_read_file_impl__mem_(bitarray, fp, bit_count);
         break;
         case BITARRAY_IO_BUFFERED:
+            TODO("read_file not implemented for IO_BUFFERED yet");
         break;
         default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
     }
 
     return ret;
@@ -213,8 +255,11 @@ bitarray_write_file(
             ret = bitarray_write_file_impl__mem_(bitarray, fp, bit_count);
         break;
         case BITARRAY_IO_BUFFERED:
+            TODO("write_file not implemented for IO_BUFFERED yet");
         break;
         default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
     }
 
     return ret;
@@ -237,6 +282,7 @@ bitarray_clean_impl__io_(
     bitarray* bitarray
 )
 {
+    bitarray_flush_impl__io_(bitarray);
     bitarray->buffered.io_buffer = 0;
     fclose(bitarray->buffered.file);
     bitarray->buffered.file = NULL;
@@ -304,6 +350,19 @@ bitarray_length_impl__mem_(
             (bitarray->in_mem.bit_offset > 0) *
             ((BITS_IN_BYTE_) - bitarray->in_mem.bit_offset)
         );
+}
+
+void
+bitarray_flush_impl__io_(
+    bitarray* bitarray
+)
+{
+    if (bitarray->buffered.bit_offset == 0)
+        return;
+
+    fputc(bitarray->buffered.io_buffer, bitarray->buffered.file);
+    bitarray->buffered.io_buffer  = 0;
+    bitarray->buffered.bit_offset = 0;
 }
 
 int64_t
