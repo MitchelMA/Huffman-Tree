@@ -24,6 +24,7 @@ static bool bitarray_append_bit_impl__mem_(bitarray* bitarray, bool value);
 static bool bitarray_append_bit_impl__io_(bitarray* bitarray, bool value);
 
 static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_length_t index);
+static int bitarray_value_at_impl__io_(const bitarray* bitarray, bitarray_length_t index);
 
 static bitarray_length_t bitarray_length_impl__mem_(const bitarray* bitarray);
 static bitarray_length_t bitarray_length_impl__io_(const bitarray* bitarray);
@@ -153,7 +154,7 @@ bitarray_value_at(
             ret = bitarray_value_at_impl__mem_(bitarray, index);
         break;
         case BITARRAY_IO_BUFFERED:
-            TODO("value_at not implemented for IO_BUFFERED yet");
+            ret = bitarray_value_at_impl__io_(bitarray, index);
         break;
         default:
             SWITCH_EXHAUST_DEFAULT;
@@ -364,6 +365,52 @@ bitarray_value_at_impl__mem_(
     return ((*container) >> bit_index) & 1;
 }
 
+int
+bitarray_value_at_impl__io_(
+    const bitarray* bitarray,
+    const bitarray_length_t index
+)
+{
+    // Calculate the stream size
+    const long size = bitarray_length_impl__io_(bitarray);
+
+    if (size < 0 || index >= (bitarray_length_t)size)
+        return -1;
+
+    const long stream_size = size - bitarray->buffered.bit_offset;
+    const long idx_in_buffer = index - stream_size;
+
+    // Read from the buffered (not-yet-flushed) value
+    if (idx_in_buffer >= 0)
+    {
+        const bitarray_length_t bit_index = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(idx_in_buffer);
+        return (bitarray->buffered.io_buffer >> bit_index) & 1;
+    }
+
+    // Read from the stream
+    const bitarray_length_t container_index = BYTE_FILLING_COUNT_(index);
+    const bitarray_length_t bit_index = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(index);
+
+    int container = 0;
+
+    // Move to the correct position within the stream
+    long restore = stream_towards_(bitarray->buffered.file, container_index, SEEK_SET);
+
+    if (restore < 0)
+        return -1;
+
+    container = fgetc(bitarray->buffered.file);
+
+    // Restore the previous position
+    if (stream_towards_(bitarray->buffered.file, restore, SEEK_SET) < 0)
+        return -1;
+
+    if (container == EOF)
+        return -1;
+
+    container = (bitarray_bitcontainer_t)container;
+    return (container >> bit_index) & 1;
+}
 
 bitarray_length_t
 bitarray_length_impl__mem_(
@@ -388,7 +435,7 @@ bitarray_length_impl__io_(
     if (stream_size < 0)
         return 0;
 
-    return stream_size * 8 + bitarray->buffered.bit_offset;
+    return stream_size * BITS_IN_BYTE_ + bitarray->buffered.bit_offset;
 }
 
 void
