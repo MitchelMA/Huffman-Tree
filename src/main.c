@@ -112,18 +112,23 @@ int main(void)
 
     bitarr_buf = open_file_write(buff_filename);
     bitarray_init_io_buffered(&arr, bitarr_buf);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 0);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 0);
-    bitarray_append_bit(&arr, 0);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 1);
+    // bitarray_init_in_mem(&arr);
+
+    const bitarray_length_t processed = huffman_compress_stream(&tree_root, text_fp, &arr);
+    const bitarray_length_t length = bitarray_length(&arr);
+
+    printf("Compressed file (%llu bits)\n", processed);
+    printf("compressed-length: %zu bytes\n", (length >> 3) + 1);
 
     print_bitarr(&arr);
     puts("");
+
+    close_file(text_fp);
+    text_fp = open_file_write("./output");
+    const size_t written = huffman_decompress_stream(&tree_root, &arr, text_fp);
+    puts("Decompressed bitarray");
+    printf("Written into stream: %zu bytes\n", written);
+    printf("Reached compression-ratio of: %0.1f%%\n", (int64_t)(length - (written * 8)) / (float)(written * 8) * 100 );
 
     huffman_node_clean(&tree_root);
     close_file(text_fp);
