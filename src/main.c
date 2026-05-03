@@ -113,6 +113,13 @@ int main(void)
     bitarr_buf = open_file_write(buff_filename);
     bitarray_init_io_buffered(&arr, bitarr_buf);
     bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 0);
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 0);
+    bitarray_append_bit(&arr, 0);
+    bitarray_append_bit(&arr, 1);
     print_bitarr(&arr);
 
     huffman_node_clean(&tree_root);

@@ -21,6 +21,7 @@ static void bitarray_clean_impl__mem_(bitarray* bitarray);
 static void bitarray_clean_impl__io_(bitarray* bitarray);
 
 static bool bitarray_append_bit_impl__mem_(bitarray* bitarray, bool value);
+static bool bitarray_append_bit_impl__io_(bitarray* bitarray, bool value);
 
 static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_length_t index);
 
@@ -119,7 +120,7 @@ bitarray_append_bit(
             ret = bitarray_append_bit_impl__mem_(bitarray, value);
         break;
         case BITARRAY_IO_BUFFERED:
-            TODO("append_bit not implemented for IO_BUFFERED yet");
+            ret = bitarray_append_bit_impl__io_(bitarray, value);
         break;
         default:
             SWITCH_EXHAUST_DEFAULT;
@@ -313,6 +314,25 @@ bitarray_append_bit_impl__mem_(
     *container |= to_be_written;
     bitarray->in_mem.bit_offset = BIT_REST_COUNT_(bitarray->in_mem.bit_offset + 1);
 
+    return true;
+}
+
+bool
+bitarray_append_bit_impl__io_(
+    bitarray* bitarray,
+    const bool value
+)
+{
+    const bitarray_bitcontainer_t writing_offset = (BITS_IN_BYTE_ - 1) - bitarray->buffered.bit_offset;
+    const bitarray_bitcontainer_t to_be_written = value << writing_offset;
+    const bitarray_bitcontainer_t next_offset_count = bitarray->buffered.bit_offset + 1;
+
+    bitarray->buffered.io_buffer |= to_be_written;
+
+    if (next_offset_count > BIT_REST_COUNT_(next_offset_count))
+        bitarray_flush_impl__io_(bitarray);
+
+    bitarray->buffered.bit_offset = BIT_REST_COUNT_(next_offset_count);
     return true;
 }
 
