@@ -46,20 +46,6 @@ static long stream_tell_size_(FILE* fp);
 // --- END LOCAL DEFINITIONS --- //
 
 bool
-bitarray_init(
-    bitarray* bitarray
-)
-{
-    if (bitarray == NULL)
-        return false;
-
-    bitarray->length = 0;
-    bitarray->content = vector_create(sizeof(bitarray_bitcontainer_t));
-
-    return bitarray->content != NULL;
-}
-
-bool
 bitarray_init_in_mem(
     bitarray* bitarray
 )
@@ -554,6 +540,8 @@ stream_towards_(
     return current_pos;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
 long
 stream_begin_(
     FILE* fp
@@ -561,6 +549,7 @@ stream_begin_(
 {
     return stream_towards_(fp, 0, SEEK_SET);
 }
+#pragma clang diagnostic pop
 
 long
 stream_end_(

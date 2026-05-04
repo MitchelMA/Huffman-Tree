@@ -189,10 +189,10 @@ int main3(void)
     huffman_node huffman_root = huffman_construct_tree(list_root);
 
     bitarray my_bitarr = {0};
-    bitarray_init(&my_bitarr);
+    bitarray_init_in_mem(&my_bitarr);
 
     huffman_compress(&huffman_root, text_length, test_text, &my_bitarr);
-    printf("Bitarray: (%li)\n", my_bitarr.length);
+    printf("Bitarray: (%li)\n", bitarray_length(&my_bitarr));
     print_bitarr(&my_bitarr);
     puts("");
 
@@ -202,7 +202,7 @@ int main3(void)
     rewind(fp);
 
     bitarray file_read = {0};
-    bitarray_init(&file_read);
+    bitarray_init_in_mem(&file_read);
     bitarray_read_file(&file_read, fp, -1);
     close_file(fp);
 
@@ -255,7 +255,7 @@ int main2(void)
 
 
     bitarray my_bitarr = {0};
-    bitarray_init(&my_bitarr);
+    bitarray_init_in_mem(&my_bitarr);
 
     const int64_t length = strlen((char*)test_text);
     for (int64_t idx = 0; idx < length; idx++)
@@ -266,13 +266,13 @@ int main2(void)
             bitarray_append_bit(&my_bitarr, path[path_len]);
     }
 
-    int byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
-    printf("\nlength: %zu (%d)\n", my_bitarr.length, byte_count);
+    int byte_count = bitarray_length(&my_bitarr) / (sizeof(char) * 8) + ((bitarray_length(&my_bitarr) % 8) > 0);
+    printf("\nlength: %zu (%d)\n", bitarray_length(&my_bitarr), byte_count);
     printf("bit-array:\n");
     print_bitarr(&my_bitarr);
     puts("");
 
-    char* buf = (char*)vector_get_start_addr_(my_bitarr.content);
+    char* buf = (char*)vector_get_start_addr_(my_bitarr.in_mem.content);
     puts("\nbinary-char-print-test:");
     for (int i = 0; i < byte_count; i++)
         printf("%08hhb", buf[i]);
@@ -290,11 +290,11 @@ int main2(void)
     bitarray_clean(&my_bitarr);
     huffman_node_clean(&huffman_root);
 
-    bitarray_init(&my_bitarr);
+    bitarray_init_in_mem(&my_bitarr);
     bitarray_read_file(&my_bitarr, fp, -1);
 
-    byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
-    printf("\nbitarray (from-file) (%lu | %d):\n", my_bitarr.length, byte_count);
+    byte_count = bitarray_length(&my_bitarr) / (sizeof(char) * 8) + ((bitarray_length(&my_bitarr) % 8) > 0);
+    printf("\nbitarray (from-file) (%lu | %d):\n", bitarray_length(&my_bitarr), byte_count);
     print_bitarr(&my_bitarr);
     puts("");
 

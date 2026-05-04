@@ -17,13 +17,6 @@ typedef enum bitarray_kinds {
 } bitarray_kinds;
 
 typedef struct bitarray_ {
-    /* The amount of bits written */
-    [[deprecated]]
-    bitarray_length_t length;
-    /* A vector of type vector(uint8_t) */
-    [[deprecated]]
-    vector_t* content;
-
     union {
         struct {
             uint8_t bit_offset : 3;
@@ -39,8 +32,6 @@ typedef struct bitarray_ {
     bitarray_kinds kind;
 } bitarray;
 
-[[deprecated]]
-bool bitarray_init(bitarray* bitarray);
 bool bitarray_init_in_mem(bitarray* bitarray);
 bool bitarray_init_io_buffered(bitarray* bitarray, FILE* fp);
 
