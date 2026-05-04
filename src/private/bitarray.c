@@ -394,7 +394,7 @@ bitarray_value_at_impl__io_(
     int container = 0;
 
     // Move to the correct position within the stream
-    long restore = stream_towards_(bitarray->buffered.file, container_index, SEEK_SET);
+    const long restore = stream_towards_(bitarray->buffered.file, container_index, SEEK_SET);
 
     if (restore < 0)
         return -1;
@@ -408,7 +408,10 @@ bitarray_value_at_impl__io_(
     if (container == EOF)
         return -1;
 
-    container = (bitarray_bitcontainer_t)container;
+    // Extract only the lower 8 bits
+    const uint8_t lower_mask = ~0;
+    container = container & lower_mask;
+
     return (container >> bit_index) & 1;
 }
 
@@ -512,8 +515,8 @@ bitarray_write_sizeheader__mem_(
     if (max_bit_count == -1)
         max_bit_count = INT64_MAX;
 
-    const bitarray_length_t bit_count = bitarray_length_impl__mem_(bitarray) > (bitarray_length_t)max_bit_count ?
-        max_bit_count
+    const bitarray_length_t bit_count = bitarray_length_impl__mem_(bitarray) > (bitarray_length_t)max_bit_count
+        ? max_bit_count
         : bitarray_length_impl__mem_(bitarray);
 
     if (fwrite(&bit_count, sizeof(bitarray_length_t), item_write_count, fp) < item_write_count)
