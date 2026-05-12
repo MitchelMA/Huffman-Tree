@@ -35,8 +35,8 @@ static int64_t bitarray_write_file_impl__mem_(bitarray* bitarray, FILE* fp, int6
 
 static bitarray_bitcontainer_t empty_container_ = 0;
 
-static bitarray_length_t bitarray_write_sizeheader__mem_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
-static bitarray_length_t bitarray_read_sizeheader__mem_(FILE* fp);
+static uint8_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
+static uint8_t bitarray_read_sizeheader_(FILE* fp);
 
 static long stream_towards_(FILE* fp, long offset, int whence);
 static long stream_begin_(FILE* fp);
@@ -449,23 +449,41 @@ bitarray_read_file_impl__mem_(
 {
     int read_value = EOF;
     bitarray_length_t read_amount = 0;
+    const uint8_t bit_offset_count = bitarray_read_sizeheader_(fp);
+    const bitarray_length_t max_byte_read = REQ_BYTE_COUNT_(bit_count);
 
-    bitarray_length_t max_bit_count = bitarray_read_sizeheader__mem_(fp);
-    max_bit_count = max_bit_count > (bitarray_length_t)bit_count
-        ? bit_count
-        : max_bit_count;
-
-    const bitarray_length_t max_byte_count = REQ_BYTE_COUNT_(max_bit_count);
-
-    while (read_amount < max_byte_count && (read_value = getc(fp)) != EOF)
+    // Read the values into the bit-array
+    while (read_amount < max_byte_read && (read_value = getc(fp)) != EOF)
     {
         read_amount++;
         bitarray_bitcontainer_t insert_value = (bitarray_bitcontainer_t)read_value;
         vector_append(bitarray->in_mem.content, (void*)&insert_value);
     }
 
-    bitarray->in_mem.bit_offset = BIT_REST_COUNT_(max_bit_count);
+    // Set the correct bit_offset to keep track of bit-count
+    if (read_amount >= max_byte_read)
+    {
+        // Test if position is at the end of the file
+        const long old_pos = stream_end_(fp);
+        const bool at_end = old_pos == ftell(fp);
+        // Restore the old position
+        stream_towards_(fp, old_pos, SEEK_SET);
 
+        const uint8_t possible_offset = BIT_REST_COUNT_(bit_count);
+
+        // Respect the given bit_offset from the file
+        bitarray->in_mem.bit_offset = at_end
+            ? possible_offset > bit_offset_count
+                ? bit_offset_count
+                : possible_offset
+            : possible_offset;
+    }
+    else
+    {
+        bitarray->in_mem.bit_offset = bit_offset_count;
+    }
+
+    // Return the amount of bytes read from file-stream
     return read_amount;
 }
 
@@ -484,13 +502,13 @@ bitarray_write_file_impl__mem_(
     const bitarray_length_t byte_count = REQ_BYTE_COUNT_(bit_count);
     const bitarray_bitcontainer_t* buffer = vector_get_start_addr_(bitarray->in_mem.content);
 
-    bitarray_write_sizeheader__mem_(bitarray, fp, bit_count);
+    bitarray_write_sizeheader_(bitarray, fp, bit_count);
     return (int64_t) fwrite(buffer, sizeof(uint8_t), byte_count, fp);
 }
 
 
-bitarray_length_t
-bitarray_write_sizeheader__mem_(
+uint8_t
+bitarray_write_sizeheader_(
     const bitarray* bitarray,
     FILE* fp,
     int64_t max_bit_count
@@ -501,25 +519,28 @@ bitarray_write_sizeheader__mem_(
     if (max_bit_count == -1)
         max_bit_count = INT64_MAX;
 
-    const bitarray_length_t bit_count = bitarray_length_impl__mem_(bitarray) > (bitarray_length_t)max_bit_count
+    bitarray_length_t bit_count = bitarray_length(bitarray);
+    bit_count = bit_count > (bitarray_length_t)max_bit_count
         ? max_bit_count
-        : bitarray_length_impl__mem_(bitarray);
+        : bit_count;
 
-    if (fwrite(&bit_count, sizeof(bitarray_length_t), item_write_count, fp) < item_write_count)
+    uint8_t bit_offset_count = BIT_REST_COUNT_(bit_count);
+
+    if (fwrite(&bit_offset_count, sizeof(bit_offset_count), item_write_count, fp) < item_write_count)
         return 0;
 
-    return bit_count;
+    return bit_offset_count;
 }
 
-bitarray_length_t
-bitarray_read_sizeheader__mem_(
+uint8_t
+bitarray_read_sizeheader_(
     FILE* fp
 )
 {
     const size_t read_count = 1;
 
-    bitarray_length_t bit_count = 0;
-    if (fread(&bit_count, sizeof(bitarray_length_t), read_count, fp) < read_count)
+    uint8_t bit_count = 0;
+    if (fread(&bit_count, sizeof(bit_count), read_count, fp) < read_count)
         return 0;
 
     return bit_count;

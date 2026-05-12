@@ -110,9 +110,9 @@ int main(void)
     huffman_node_print_depth(&tree_root);
     puts("");
 
-    bitarr_buf = open_file_write(buff_filename);
-    bitarray_init_io_buffered(&arr, bitarr_buf);
-    // bitarray_init_in_mem(&arr);
+    // bitarr_buf = open_file_write(buff_filename);
+    // bitarray_init_io_buffered(&arr, bitarr_buf);
+    bitarray_init_in_mem(&arr);
 
     const bitarray_length_t processed = huffman_compress_stream(&tree_root, text_fp, &arr);
     const bitarray_length_t length = bitarray_length(&arr);
@@ -123,9 +123,25 @@ int main(void)
     print_bitarr(&arr);
     puts("");
 
+    // write compressed into file
+    puts("Writing compressed into file...");
+    FILE* comp_fp = open_file_write("compressed.huff");
+    bitarray_write_file(&arr, comp_fp, -1);
+    rewind(comp_fp);
+
+    // Restore into different bitarray
+    puts("\nRestoring from file into bitarray");
+    bitarray rest_arr = {0};
+    bitarray_init_in_mem(&rest_arr);
+    bitarray_read_file(&rest_arr, comp_fp, -1);
+    close_file(comp_fp);
+    print_bitarr(&rest_arr);
+    puts("");
+
+    // Write the restored bitarray into output so we know the whole process was successful or not
     close_file(text_fp);
     text_fp = open_file_write("./output");
-    const size_t written = huffman_decompress_stream(&tree_root, &arr, text_fp);
+    const size_t written = huffman_decompress_stream(&tree_root, &rest_arr, text_fp);
     puts("Decompressed bitarray");
     printf("Written into stream: %zu bytes\n", written);
     printf("Reached compression-ratio of: %0.1f%%\n", (int64_t)(length - (written * 8)) / (float)(written * 8) * 100 );
@@ -133,6 +149,7 @@ int main(void)
     huffman_node_clean(&tree_root);
     close_file(text_fp);
     bitarray_clean(&arr);
+    bitarray_clean(&rest_arr);
 
     return EXIT_SUCCESS;
 }
