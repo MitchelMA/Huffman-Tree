@@ -32,8 +32,10 @@ static bitarray_length_t bitarray_length_impl__io_(const bitarray* bitarray);
 static void bitarray_flush_impl__io_(bitarray* bitarray);
 static int64_t bitarray_read_file_impl__mem_(bitarray* bitarray, FILE* fp, int64_t bit_count);
 static int64_t bitarray_write_file_impl__mem_(bitarray* bitarray, FILE* fp, int64_t bit_count);
+static int64_t bitarray_read_file_impl__io_(bitarray* bitarray, FILE* fp, int64_t bit_count);
+static int64_t bitarray_write_file_impl__io_(bitarray* bitarray, FILE* fp, int64_t bit_count);
+static uint8_t bitarray_restore_bit_offset_(FILE* fp, uint8_t preferred, uint8_t abide);
 
-static bitarray_bitcontainer_t empty_container_ = 0;
 
 static uint8_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
 static uint8_t bitarray_read_sizeheader_(FILE* fp);
@@ -42,6 +44,9 @@ static long stream_towards_(FILE* fp, long offset, int whence);
 static long stream_begin_(FILE* fp);
 static long stream_end_(FILE* fp);
 static long stream_tell_size_(FILE* fp);
+static long stream_tell_remaining_size_(FILE* fp);
+
+static bitarray_bitcontainer_t empty_container_ = 0;
 
 // --- END LOCAL DEFINITIONS --- //
 
@@ -218,7 +223,8 @@ bitarray_read_file(
             ret = bitarray_read_file_impl__mem_(bitarray, fp, bit_count);
         break;
         case BITARRAY_IO_BUFFERED:
-            TODO("read_file not implemented for IO_BUFFERED yet");
+            // TODO("read_file not implemented for IO_BUFFERED yet");
+            ret = bitarray_read_file_impl__io_(bitarray, fp, bit_count);
         break;
         default:
             SWITCH_EXHAUST_DEFAULT;
@@ -463,20 +469,11 @@ bitarray_read_file_impl__mem_(
     // Set the correct bit_offset to keep track of bit-count
     if (read_amount >= max_byte_read)
     {
-        // Test if position is at the end of the file
-        const long old_pos = stream_end_(fp);
-        const bool at_end = old_pos == ftell(fp);
-        // Restore the old position
-        stream_towards_(fp, old_pos, SEEK_SET);
-
-        const uint8_t possible_offset = BIT_REST_COUNT_(bit_count);
+        const uint8_t preferred_offset = BIT_REST_COUNT_(bit_count);
 
         // Respect the given bit_offset from the file
-        bitarray->in_mem.bit_offset = at_end
-            ? possible_offset > bit_offset_count
-                ? bit_offset_count
-                : possible_offset
-            : possible_offset;
+        bitarray->in_mem.bit_offset =
+            bitarray_restore_bit_offset_(fp, preferred_offset, bit_offset_count);
     }
     else
     {
@@ -506,6 +503,101 @@ bitarray_write_file_impl__mem_(
     return (int64_t) fwrite(buffer, sizeof(uint8_t), byte_count, fp);
 }
 
+int64_t
+bitarray_read_file_impl__io_(
+    bitarray* bitarray,
+    FILE* fp,
+    int64_t bit_count
+)
+{
+    int read_value = EOF;
+    bitarray_length_t read_amount = 0;
+
+    const uint8_t bit_offset_count = bitarray_read_sizeheader_(fp);
+    const long file_byte_length = stream_tell_remaining_size_(fp);
+    const bitarray_length_t max_byte_read = REQ_BYTE_COUNT_(bit_count) > file_byte_length
+        ? file_byte_length
+        : REQ_BYTE_COUNT_(bit_count);
+
+    int64_t remaining_bit_count = (max_byte_read << BIT_MOST_SIGNIFICANT_)
+            - (bit_offset_count > 0) * (BITS_IN_BYTE_ - bit_offset_count);
+
+    if (max_byte_read < file_byte_length)
+        remaining_bit_count = bit_count < (max_byte_read << BIT_MOST_SIGNIFICANT_)
+            ? bit_count
+            : (max_byte_read << BIT_MOST_SIGNIFICANT_);
+
+    bit_count = bit_count > bit_remaining_count
+        ? bit_remaining_count
+        : bit_count;
+
+    // Read the values into the bit-array
+    while (remaining_bit_count >= BITS_IN_BYTE_ && (read_value = getc(fp)) != EOF)
+    {
+        read_amount++;
+        remaining_bit_count -= BITS_IN_BYTE_;
+        fputc(read_value, bitarray->buffered.file);
+    }
+
+    if (remaining_bit_count > 0)
+    {
+        const uint8_t preferred_offset = BIT_REST_COUNT_(bit_count);
+
+        // Respect the given bit_offset from the file
+        bitarray->buffered.bit_offset =
+            bitarray_restore_bit_offset_(fp, preferred_offset, bit_offset_count);
+
+        bitarray->buffered.io_buffer = getc(fp) & 
+            ~(BITS_IN_BYTE_ - bitarray->buffered.bit_offset);
+    }
+
+    // Set the correct bit_offset to keep track of bit-count
+    // if (read_amount >= max_byte_read)
+    // {
+    //     const uint8_t preferred_offset = BIT_REST_COUNT_(bit_count);
+
+    //     // Respect the given bit_offset from the file
+    //     bitarray->buffered.bit_offset =
+    //         bitarray_restore_bit_offset_(fp, preferred_offset, bit_offset_count);
+    // }
+    // else
+    // {
+    //     bitarray->buffered.bit_offset = bit_offset_count;
+    // }
+
+    return read_amount;
+}
+
+int64_t
+bitarray_write_file_impl__io_(
+    bitarray* bitarray,
+    FILE* fp,
+    int64_t bit_count
+)
+{
+}
+
+uint8_t
+bitarray_restore_bit_offset_(
+    FILE* fp,
+    uint8_t preferred,
+    uint8_t abide
+)
+{
+    // Test if position is at the end of the file
+    const long old_pos = stream_end_(fp);
+    const bool at_end = old_pos == ftell(fp);
+    // Restore the old position
+    stream_towards_(fp, old_pos, SEEK_SET);
+
+    if (!at_end)
+        return preferred;
+
+    // Respect the given bit_offset from the "abide"
+    return preferred > abide
+        ? abide
+        : preferred;
+}
 
 uint8_t
 bitarray_write_sizeheader_(
@@ -593,6 +685,24 @@ stream_tell_size_(
 
     // Restore initial position and return the position at the end (length)
     return stream_towards_(fp, initial, SEEK_SET);
+}
+
+long
+stream_tell_remaining_size_(
+    FILE* fp
+)
+{
+    const long start = stream_end_(fp);
+
+    if (start < 0)
+        return start;
+        
+    const long end = stream_towards_(fp, start, SEEK_SET);
+
+    if (end < 0)
+        return end;
+
+    return end - start;
 }
 
 // --- END LOCAL IMPLEMENTATIONS --- //
