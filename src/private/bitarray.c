@@ -223,7 +223,6 @@ bitarray_read_file(
             ret = bitarray_read_file_impl__mem_(bitarray, fp, bit_count);
         break;
         case BITARRAY_IO_BUFFERED:
-            // TODO("read_file not implemented for IO_BUFFERED yet");
             ret = bitarray_read_file_impl__io_(bitarray, fp, bit_count);
         break;
         default:
@@ -513,23 +512,20 @@ bitarray_read_file_impl__io_(
     int read_value = EOF;
     bitarray_length_t read_amount = 0;
 
+    // Calculate the file written bit_offset and the maximum amount of
+    // bytes that can be read
     const uint8_t bit_offset_count = bitarray_read_sizeheader_(fp);
     const long file_byte_length = stream_tell_remaining_size_(fp);
     const bitarray_length_t max_byte_read = REQ_BYTE_COUNT_(bit_count) > file_byte_length
         ? file_byte_length
         : REQ_BYTE_COUNT_(bit_count);
 
-    int64_t remaining_bit_count = (max_byte_read << BIT_MOST_SIGNIFICANT_)
-            - (bit_offset_count > 0) * (BITS_IN_BYTE_ - bit_offset_count);
-
-    if (max_byte_read < file_byte_length)
-        remaining_bit_count = bit_count < (max_byte_read << BIT_MOST_SIGNIFICANT_)
-            ? bit_count
-            : (max_byte_read << BIT_MOST_SIGNIFICANT_);
-
-    bit_count = bit_count > bit_remaining_count
-        ? bit_remaining_count
-        : bit_count;
+    // Calculate the correct amount of bits that will be read
+    int64_t remaining_bit_count = max_byte_read < (bitarray_length_t)file_byte_length
+        ? (max_byte_read << BIT_MOST_SIGNIFICANT_)
+          - (BIT_REST_COUNT_(bit_count) > 0) * (BITS_IN_BYTE_ - BIT_REST_COUNT_(bit_count))
+        : (max_byte_read << BIT_MOST_SIGNIFICANT_)
+          - (bit_offset_count > 0) * (BITS_IN_BYTE_ - bit_offset_count);
 
     // Read the values into the bit-array
     while (remaining_bit_count >= BITS_IN_BYTE_ && (read_value = getc(fp)) != EOF)
@@ -539,31 +535,17 @@ bitarray_read_file_impl__io_(
         fputc(read_value, bitarray->buffered.file);
     }
 
+    // Read the remaining bits that total at less than 8 bits into the io_buffer
     if (remaining_bit_count > 0)
     {
-        const uint8_t preferred_offset = BIT_REST_COUNT_(bit_count);
+        const uint8_t preferred_offset = BIT_REST_COUNT_(remaining_bit_count);
 
         // Respect the given bit_offset from the file
         bitarray->buffered.bit_offset =
             bitarray_restore_bit_offset_(fp, preferred_offset, bit_offset_count);
 
-        bitarray->buffered.io_buffer = getc(fp) & 
-            ~(BITS_IN_BYTE_ - bitarray->buffered.bit_offset);
+        bitarray->buffered.io_buffer = getc(fp);
     }
-
-    // Set the correct bit_offset to keep track of bit-count
-    // if (read_amount >= max_byte_read)
-    // {
-    //     const uint8_t preferred_offset = BIT_REST_COUNT_(bit_count);
-
-    //     // Respect the given bit_offset from the file
-    //     bitarray->buffered.bit_offset =
-    //         bitarray_restore_bit_offset_(fp, preferred_offset, bit_offset_count);
-    // }
-    // else
-    // {
-    //     bitarray->buffered.bit_offset = bit_offset_count;
-    // }
 
     return read_amount;
 }
@@ -696,7 +678,7 @@ stream_tell_remaining_size_(
 
     if (start < 0)
         return start;
-        
+
     const long end = stream_towards_(fp, start, SEEK_SET);
 
     if (end < 0)
