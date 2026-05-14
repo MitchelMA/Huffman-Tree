@@ -1,5 +1,7 @@
 #include "bitarray.h"
 
+#include "utility.h"
+
 #include <stdio.h>
 #include <assert.h>
 
@@ -35,7 +37,6 @@ static int64_t bitarray_write_file_impl__mem_(bitarray* bitarray, FILE* fp, int6
 static int64_t bitarray_read_file_impl__io_(bitarray* bitarray, FILE* fp, int64_t bit_count);
 static int64_t bitarray_write_file_impl__io_(bitarray* bitarray, FILE* fp, int64_t bit_count);
 static uint8_t bitarray_restore_bit_offset_(FILE* fp, uint8_t preferred, uint8_t abide);
-
 
 static uint8_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
 static uint8_t bitarray_read_sizeheader_(FILE* fp);
@@ -513,19 +514,14 @@ bitarray_read_file_impl__io_(
     bitarray_length_t read_amount = 0;
 
     // Calculate the file written bit_offset and the maximum amount of
-    // bytes that can be read
+    // bits that can be read
     const uint8_t bit_offset_count = bitarray_read_sizeheader_(fp);
     const long file_byte_length = stream_tell_remaining_size_(fp);
-    const bitarray_length_t max_byte_read = REQ_BYTE_COUNT_(bit_count) > file_byte_length
-        ? file_byte_length
-        : REQ_BYTE_COUNT_(bit_count);
+    const int64_t max_bit_reads = (file_byte_length << BIT_MOST_SIGNIFICANT_)
+        - (bit_offset_count > 0) * (BITS_IN_BYTE_ - bit_offset_count);
 
-    // Calculate the correct amount of bits that will be read
-    int64_t remaining_bit_count = max_byte_read < (bitarray_length_t)file_byte_length
-        ? (max_byte_read << BIT_MOST_SIGNIFICANT_)
-          - (BIT_REST_COUNT_(bit_count) > 0) * (BITS_IN_BYTE_ - BIT_REST_COUNT_(bit_count))
-        : (max_byte_read << BIT_MOST_SIGNIFICANT_)
-          - (bit_offset_count > 0) * (BITS_IN_BYTE_ - bit_offset_count);
+    bit_count = MIN(bit_count, max_bit_reads);
+    int64_t remaining_bit_count = bit_count;
 
     // Read the values into the bit-array
     while (remaining_bit_count >= BITS_IN_BYTE_ && (read_value = getc(fp)) != EOF)
@@ -576,9 +572,7 @@ bitarray_restore_bit_offset_(
         return preferred;
 
     // Respect the given bit_offset from the "abide"
-    return preferred > abide
-        ? abide
-        : preferred;
+    return MIN(preferred, abide);
 }
 
 uint8_t
@@ -594,9 +588,7 @@ bitarray_write_sizeheader_(
         max_bit_count = INT64_MAX;
 
     bitarray_length_t bit_count = bitarray_length(bitarray);
-    bit_count = bit_count > (bitarray_length_t)max_bit_count
-        ? max_bit_count
-        : bit_count;
+    bit_count = MIN(bit_count, (bitarray_length_t)max_bit_count);
 
     uint8_t bit_offset_count = BIT_REST_COUNT_(bit_count);
 
