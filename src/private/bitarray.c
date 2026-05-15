@@ -15,6 +15,9 @@
 #define BIT_REST_COUNT_(BIT_AMOUNT) ( (BIT_AMOUNT) & (BITS_IN_BYTE_ - 1) )
 #define REQ_BYTE_COUNT_(BIT_AMOUNT) ( BYTE_FILLING_COUNT_(BIT_AMOUNT) + (BIT_REST_COUNT_(BIT_AMOUNT) > 0) )
 
+#define MASK_FROM_RIGHT_(BITS_ON) ((1 << (BITS_ON)) - 1)
+#define MASK_FROM_LEFT_(TYPE, BITS_ON) (~MASK_FROM_RIGHT_(BIT_COUNT_(TYPE) - BITS_ON))
+
 #define FAIL_ASSERT(MSG) assert(0 && MSG)
 #define SWITCH_EXHAUST_DEFAULT FAIL_ASSERT("This case should not be reached: the bitarray is of unkown kind")
 #define TODO(MSG) FAIL_ASSERT(MSG)
@@ -255,7 +258,7 @@ bitarray_write_file(
             ret = bitarray_write_file_impl__mem_(bitarray, fp, bit_count);
         break;
         case BITARRAY_IO_BUFFERED:
-            TODO("write_file not implemented for IO_BUFFERED yet");
+            ret = bitarray_write_file_impl__io_(bitarray, fp, bit_count);
         break;
         default:
             SWITCH_EXHAUST_DEFAULT;
@@ -553,6 +556,46 @@ bitarray_write_file_impl__io_(
     int64_t bit_count
 )
 {
+    // Calculate the proper bit_length and required bytes to write from the bit-array stream
+    const bitarray_length_t container_bit_count = bitarray_length_impl__io_(bitarray);
+
+    if ((bitarray_length_t) bit_count > container_bit_count)
+        bit_count = (int64_t) container_bit_count;
+
+    const int64_t requested_stream_bit_count    = bit_count - bitarray->buffered.bit_offset;
+    const bitarray_length_t required_byte_count = REQ_BYTE_COUNT_(MAX(requested_stream_bit_count, 0));
+
+    // Write the header
+    bitarray_write_sizeheader_(bitarray, fp, bit_count);
+
+    int read_val = EOF;
+    int64_t byte_write_count = 0;
+
+    const long restore = stream_begin_(bitarray->buffered.file);
+
+    // Write from the bitarray-stream into the file stream
+    while ((bitarray_length_t) byte_write_count < required_byte_count && (read_val = fgetc(bitarray->buffered.file)) != EOF)
+    {
+        fputc(read_val, fp);
+        byte_write_count++;
+    }
+
+    // Write the remaining bits that didn't form a full byte
+    const uint8_t remaining_bit_count = BIT_REST_COUNT_(bit_count);
+    if (remaining_bit_count > 0)
+    {
+        int to_write = fgetc(bitarray->buffered.file);
+
+        if (to_write == EOF)
+            to_write = (int) bitarray->buffered.io_buffer;
+
+        const uint8_t mask = MASK_FROM_LEFT_(uint8_t, remaining_bit_count);
+        byte_write_count += fputc(to_write & mask, fp) != EOF;
+    }
+
+    stream_towards_(bitarray->buffered.file, restore, SEEK_SET);
+
+    return byte_write_count;
 }
 
 uint8_t
