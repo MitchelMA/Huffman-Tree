@@ -135,6 +135,7 @@ int main(void)
     puts("\nRestoring from file into bitarray");
     bitarray rest_arr = {0};
     bitarray_init_io_buffered(&rest_arr, bitarr_buf);
+    // bitarray_init_in_mem(&rest_arr);
     bitarray_read_file(&rest_arr, comp_fp, -1);
     close_file(comp_fp);
     print_bitarr(&rest_arr);

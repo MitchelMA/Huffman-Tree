@@ -572,7 +572,9 @@ bitarray_restore_bit_offset_(
         return preferred;
 
     // Respect the given bit_offset from the "abide"
-    return MIN(preferred, abide);
+    return preferred == 0
+        ? abide
+        : MIN(preferred, abide);
 }
 
 uint8_t
