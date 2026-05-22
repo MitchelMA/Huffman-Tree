@@ -15,8 +15,8 @@
 #define BIT_REST_COUNT_(BIT_AMOUNT) ( (BIT_AMOUNT) & (BITS_IN_BYTE_ - 1) )
 #define REQ_BYTE_COUNT_(BIT_AMOUNT) ( BYTE_FILLING_COUNT_(BIT_AMOUNT) + (BIT_REST_COUNT_(BIT_AMOUNT) > 0) )
 
-#define MASK_FROM_RIGHT_(BITS_ON) ((1 << (BITS_ON)) - 1)
-#define MASK_FROM_LEFT_(TYPE, BITS_ON) (~MASK_FROM_RIGHT_(BIT_COUNT_(TYPE) - BITS_ON))
+#define MASK_FROM_RIGHT_(TYPE, BITS_ON) ((((TYPE)1) << (BITS_ON)) - 1)
+#define MASK_FROM_LEFT_(TYPE, BITS_ON) (~MASK_FROM_RIGHT_(TYPE, BIT_COUNT_(TYPE) - (BITS_ON)))
 
 #define FAIL_ASSERT(MSG) assert(0 && MSG)
 #define SWITCH_EXHAUST_DEFAULT FAIL_ASSERT("This case should not be reached: the bitarray is of unkown kind")
