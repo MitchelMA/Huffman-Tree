@@ -219,7 +219,7 @@ huffman_decompress(
     if (root == NULL || bit_array == NULL || buffer_size == 0 || buffer == NULL)
         return 0;
 
-    const bitarray_length_t bit_arr_len = bit_array->length;
+    const bitarray_length_t bit_arr_len = bitarray_length(bit_array);
     size_t buffer_written = 0;
     const huffman_node* path = root;
 
@@ -256,7 +256,7 @@ huffman_decompress_stream(
     if (root == NULL || bit_array == NULL || out_stream == NULL)
         return 0;
 
-    const bitarray_length_t bit_arr_len = bit_array->length;
+    const bitarray_length_t bit_arr_len = bitarray_length(bit_array);
     size_t stream_written = 0;
     const huffman_node* path = root;
 

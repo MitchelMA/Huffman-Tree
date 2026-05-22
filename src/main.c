@@ -76,16 +76,88 @@ void print_uncompressed_text(const uint8_t* text)
 
 void print_bitarr(const bitarray* bitarray)
 {
-    for (int64_t i = 0; i < (int64_t)bitarray->length; i++)
+    int64_t length = bitarray_length(bitarray);
+    for (int64_t i = 0; i < length; i++)
     {
         if (i % 8 == 0 && i != 0)
             printf("");
 
         printf("%d", bitarray_value_at(bitarray, i));
     }
+
+    printf(" (%d)", bitarray_length(bitarray));
 }
 
 int main(void)
+{
+    huffman_node tree_root = {0};
+    bitarray arr = {0};
+    const char* text_filename;
+    const char* buff_filename;
+    FILE* text_fp    = NULL;
+    FILE* bitarr_buf = NULL;
+
+    text_filename = "./input";
+    buff_filename = "./bitarr_buff";
+    text_fp  = open_file_read(text_filename);
+    puts("Opened text file");
+
+    dlinked_list_node* counted_nodes = huffman_count_stream_onepass(text_fp);
+    rewind(text_fp);
+    puts("Parsed for symbol-count:");
+    doublyll_print(counted_nodes);
+
+    tree_root = huffman_construct_tree(counted_nodes);
+    puts("Constructed tree");
+    huffman_node_print_depth(&tree_root);
+    puts("");
+
+    bitarr_buf = open_file_write(buff_filename);
+    bitarray_init_io_buffered(&arr, bitarr_buf);
+    // bitarray_init_in_mem(&arr);
+
+    const bitarray_length_t processed = huffman_compress_stream(&tree_root, text_fp, &arr);
+    const bitarray_length_t length = bitarray_length(&arr);
+
+    printf("Compressed file (%llu bits)\n", processed);
+    printf("compressed-length: %zu bytes\n", (length >> 3) + 1);
+
+    print_bitarr(&arr);
+    puts("");
+
+    // write compressed into file
+    puts("Writing compressed into file...");
+    FILE* comp_fp = open_file_write("compressed.huff");
+    bitarray_write_file(&arr, comp_fp, -1);
+    rewind(comp_fp);
+
+    // Restore into different bitarray
+    puts("\nRestoring from file into bitarray");
+    bitarray rest_arr = {0};
+    // bitarray_init_io_buffered(&rest_arr, bitarr_buf);
+    bitarray_init_in_mem(&rest_arr);
+    bitarray_read_file(&rest_arr, comp_fp, -1);
+    close_file(comp_fp);
+    print_bitarr(&rest_arr);
+    puts("");
+
+    // Write the restored bitarray into output so we know the whole process was successful or not
+    close_file(text_fp);
+    text_fp = open_file_write("./output");
+    const size_t written = huffman_decompress_stream(&tree_root, &rest_arr, text_fp);
+    puts("Decompressed bitarray");
+    printf("Written into stream: %zu bytes\n", written);
+    printf("Reached compression-ratio of: %0.1f%%\n", (int64_t)(length - (written * 8)) / (float)(written * 8) * 100 );
+
+    huffman_node_clean(&tree_root);
+    close_file(text_fp);
+    bitarray_clean(&arr);
+    bitarray_clean(&rest_arr);
+
+    return EXIT_SUCCESS;
+}
+
+int main4(void)
 {
     const char* filename = "./input";
     FILE* fp = open_file_read(filename);
@@ -103,10 +175,13 @@ int main(void)
     puts("");
 
     bitarray arr = {0};
-    bitarray_init(&arr);
-    huffman_compress_stream(&tree_root, fp, &arr);
-    puts("Compressed file");
-    printf("compressed-length: %zu\n", (arr.length >> 3) + 1);
+    bitarray_init_in_mem(&arr);
+
+    const bitarray_length_t processed = huffman_compress_stream(&tree_root, fp, &arr);
+    const bitarray_length_t length = bitarray_length(&arr);
+
+    printf("Compressed file (%llu bits)\n", processed);
+    printf("compressed-length: %zu bytes\n", (length >> 3) + 1);
     close_file(fp);
 
     print_bitarr(&arr);
@@ -114,9 +189,9 @@ int main(void)
 
     fp = open_file_write("./output");
     const size_t written = huffman_decompress_stream(&tree_root, &arr, fp);
-
     puts("Decompressed bitarray");
-    printf("Written into stream: %zu\n", written);
+    printf("Written into stream: %zu bytes\n", written);
+    printf("Reached compression-ratio of: %0.1f%%\n", (int64_t)(length - (written * 8)) / (float)(written * 8) * 100 );
 
     huffman_node_clean(&tree_root);
     bitarray_clean(&arr);
@@ -134,10 +209,10 @@ int main3(void)
     huffman_node huffman_root = huffman_construct_tree(list_root);
 
     bitarray my_bitarr = {0};
-    bitarray_init(&my_bitarr);
+    bitarray_init_in_mem(&my_bitarr);
 
     huffman_compress(&huffman_root, text_length, test_text, &my_bitarr);
-    printf("Bitarray: (%li)\n", my_bitarr.length);
+    printf("Bitarray: (%li)\n", bitarray_length(&my_bitarr));
     print_bitarr(&my_bitarr);
     puts("");
 
@@ -147,7 +222,7 @@ int main3(void)
     rewind(fp);
 
     bitarray file_read = {0};
-    bitarray_init(&file_read);
+    bitarray_init_in_mem(&file_read);
     bitarray_read_file(&file_read, fp, -1);
     close_file(fp);
 
@@ -200,7 +275,7 @@ int main2(void)
 
 
     bitarray my_bitarr = {0};
-    bitarray_init(&my_bitarr);
+    bitarray_init_in_mem(&my_bitarr);
 
     const int64_t length = strlen((char*)test_text);
     for (int64_t idx = 0; idx < length; idx++)
@@ -211,13 +286,13 @@ int main2(void)
             bitarray_append_bit(&my_bitarr, path[path_len]);
     }
 
-    int byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
-    printf("\nlength: %zu (%d)\n", my_bitarr.length, byte_count);
+    int byte_count = bitarray_length(&my_bitarr) / (sizeof(char) * 8) + ((bitarray_length(&my_bitarr) % 8) > 0);
+    printf("\nlength: %zu (%d)\n", bitarray_length(&my_bitarr), byte_count);
     printf("bit-array:\n");
     print_bitarr(&my_bitarr);
     puts("");
 
-    char* buf = (char*)vector_get_start_addr_(my_bitarr.content);
+    char* buf = (char*)vector_get_start_addr_(my_bitarr.in_mem.content);
     puts("\nbinary-char-print-test:");
     for (int i = 0; i < byte_count; i++)
         printf("%08hhb", buf[i]);
@@ -235,11 +310,11 @@ int main2(void)
     bitarray_clean(&my_bitarr);
     huffman_node_clean(&huffman_root);
 
-    bitarray_init(&my_bitarr);
+    bitarray_init_in_mem(&my_bitarr);
     bitarray_read_file(&my_bitarr, fp, -1);
 
-    byte_count = my_bitarr.length / (sizeof(char) * 8) + ((my_bitarr.length % 8) > 0);
-    printf("\nbitarray (from-file) (%lu | %d):\n", my_bitarr.length, byte_count);
+    byte_count = bitarray_length(&my_bitarr) / (sizeof(char) * 8) + ((bitarray_length(&my_bitarr) % 8) > 0);
+    printf("\nbitarray (from-file) (%lu | %d):\n", bitarray_length(&my_bitarr), byte_count);
     print_bitarr(&my_bitarr);
     puts("");
 
