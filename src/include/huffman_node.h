@@ -30,7 +30,8 @@ typedef struct huffman_node_ {
     union {
         struct node_branching_ branching;
         struct node_leaf_           leaf;
-    } type;
+    };
+
     bool is_branching;
 } huffman_node;
 
