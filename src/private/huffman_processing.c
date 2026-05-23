@@ -237,7 +237,7 @@ huffman_decompress(
         if (buffer_written >= buffer_size - 1)
             break;
 
-        buffer[buffer_written++] = path->type.leaf.val;
+        buffer[buffer_written++] = path->leaf.val;
         path = root;
     }
 
@@ -271,7 +271,7 @@ huffman_decompress_stream(
         if (path->is_branching)
             continue;
 
-        if (fputc(path->type.leaf.val, out_stream) == EOF)
+        if (fputc(path->leaf.val, out_stream) == EOF)
             break;
 
         stream_written++;
@@ -509,7 +509,7 @@ doublyll_insert_or_update_(
     // First search if this symbol already exists in the list
     while (target != NULL)
     {
-        if (target->node.type.leaf.val == symbol)
+        if (target->node.leaf.val == symbol)
             break;
 
         previous = target;
@@ -527,7 +527,7 @@ doublyll_insert_or_update_(
         target->prev = previous;
     }
 
-    target->node.type.leaf.count++;
+    target->node.leaf.count++;
 
     // Find the place where we should *actually* insert the newly created/updated node
     dlinked_list_node* newly = target;
@@ -566,9 +566,9 @@ calculate_consecutive_(
     if (!huffman_node_init_leaf(output, *current, 0))
         return NULL;
 
-    while (current < last && output->type.leaf.val == *current)
+    while (current < last && output->leaf.val == *current)
     {
-        output->type.leaf.count++;
+        output->leaf.count++;
         current++;
     }
 
