@@ -41,7 +41,7 @@ endif()
 FetchContent_Declare(
     CVector
     GIT_REPOSITORY https://github.com/MitchelMA/CVector.git
-    GIT_TAG main
+    GIT_TAG 1.0.0
 )
 FetchContent_Declare(
     CString
