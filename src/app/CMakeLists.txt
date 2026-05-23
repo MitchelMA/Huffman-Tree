@@ -1,18 +1,16 @@
-file(GLOB_RECURSE PRIVATE_SOURCES ./private/*.c)
+add_executable(${PROJECT_NAME}
+    main.c)
 
-add_executable(HuffmanTree
-    main.c
-    ${PRIVATE_SOURCES})
-
-target_link_libraries(HuffmanTree
+target_link_libraries(${PROJECT_NAME}
     PUBLIC
-    CVector
-    $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:asan ubsan>)
+    ${PROJECT_NAME}-static)
 
-target_compile_options(HuffmanTree
+    #$<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:asan ubsan>)
+
+target_compile_options(${PROJECT_NAME}
     PUBLIC
     ${BUILD_PARAMS})
 
-target_include_directories(HuffmanTree
+target_include_directories(${PROJECT_NAME}
     PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include)
