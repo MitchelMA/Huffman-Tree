@@ -34,8 +34,9 @@ else()
     set(BUILD_PARAMS
         -std=c23
         -Wall -Wextra -Wpedantic -pedantic -Wundef
-        $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:-O0 -g -ggdb -fsanitize=address,undefined,leak>
+        $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:-O0 -g -ggdb -save-temps>
         $<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,RELEASE>:-Werror -O3>)
+# -fsanitize=address,undefined,leak
 endif()
 
 FetchContent_Declare(
@@ -56,4 +57,5 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(CVector)
 
-add_subdirectory(src)
+add_subdirectory(src/app)
+add_subdirectory(src/static-lib)
