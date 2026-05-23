@@ -56,4 +56,4 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(CVector)
 
-add_subdirectory(src)
+add_subdirectory(src/app)
