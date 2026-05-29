@@ -1,6 +1,7 @@
 #include "bitarray.h"
 
 #include "utility.h"
+#include "io.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -43,12 +44,6 @@ static uint8_t bitarray_restore_bit_offset_(FILE* fp, uint8_t preferred, uint8_t
 
 static uint8_t bitarray_write_sizeheader_(const bitarray* bitarray, FILE* fp, int64_t max_bit_count);
 static uint8_t bitarray_read_sizeheader_(FILE* fp);
-
-static long stream_towards_(FILE* fp, long offset, int whence);
-static long stream_begin_(FILE* fp);
-static long stream_end_(FILE* fp);
-static long stream_tell_size_(FILE* fp);
-static long stream_tell_remaining_size_(FILE* fp);
 
 static bitarray_bitcontainer_t empty_container_ = 0;
 
@@ -275,6 +270,9 @@ bitarray_clean_impl__mem_(
     bitarray* bitarray
 )
 {
+    if (bitarray->in_mem.content == NULL)
+        return;
+
     bitarray->in_mem.bit_offset = 0;
     vector_clean(bitarray->in_mem.content);
     bitarray->in_mem.content = NULL;
@@ -285,6 +283,9 @@ bitarray_clean_impl__io_(
     bitarray* bitarray
 )
 {
+    if (bitarray->buffered.file == NULL)
+        return;
+
     bitarray_flush_impl__io_(bitarray);
     bitarray->buffered.io_buffer = 0;
     fclose(bitarray->buffered.file);
@@ -389,7 +390,7 @@ bitarray_value_at_impl__io_(
     int container = 0;
 
     // Move to the correct position within the stream
-    const long restore = stream_towards_(bitarray->buffered.file, container_index, SEEK_SET);
+    const long restore = stream_towards(bitarray->buffered.file, container_index, SEEK_SET);
 
     if (restore < 0)
         return -1;
@@ -397,7 +398,7 @@ bitarray_value_at_impl__io_(
     container = fgetc(bitarray->buffered.file);
 
     // Restore the previous position
-    if (stream_towards_(bitarray->buffered.file, restore, SEEK_SET) < 0)
+    if (stream_towards(bitarray->buffered.file, restore, SEEK_SET) < 0)
         return -1;
 
     if (container == EOF)
@@ -428,7 +429,7 @@ bitarray_length_impl__io_(
     const bitarray* bitarray
 )
 {
-    const long stream_size = stream_tell_size_(bitarray->buffered.file);
+    const long stream_size = stream_tell_size(bitarray->buffered.file);
 
     if (stream_size < 0)
         return 0;
@@ -519,7 +520,7 @@ bitarray_read_file_impl__io_(
     // Calculate the file written bit_offset and the maximum amount of
     // bits that can be read
     const uint8_t bit_offset_count = bitarray_read_sizeheader_(fp);
-    const long file_byte_length = stream_tell_remaining_size_(fp);
+    const long file_byte_length = stream_tell_remaining_size(fp);
     const int64_t max_bit_reads = (file_byte_length << BIT_MOST_SIGNIFICANT_)
         - (bit_offset_count > 0) * (BITS_IN_BYTE_ - bit_offset_count);
 
@@ -571,7 +572,7 @@ bitarray_write_file_impl__io_(
     int read_val = EOF;
     int64_t byte_write_count = 0;
 
-    const long restore = stream_begin_(bitarray->buffered.file);
+    const long restore = stream_begin(bitarray->buffered.file);
 
     // Write from the bitarray-stream into the file stream
     while ((bitarray_length_t) byte_write_count < required_byte_count && (read_val = fgetc(bitarray->buffered.file)) != EOF)
@@ -593,7 +594,7 @@ bitarray_write_file_impl__io_(
         byte_write_count += fputc(to_write & mask, fp) != EOF;
     }
 
-    stream_towards_(bitarray->buffered.file, restore, SEEK_SET);
+    stream_towards(bitarray->buffered.file, restore, SEEK_SET);
 
     return byte_write_count;
 }
@@ -606,10 +607,10 @@ bitarray_restore_bit_offset_(
 )
 {
     // Test if position is at the end of the file
-    const long old_pos = stream_end_(fp);
+    const long old_pos = stream_end(fp);
     const bool at_end = old_pos == ftell(fp);
     // Restore the old position
-    stream_towards_(fp, old_pos, SEEK_SET);
+    stream_towards(fp, old_pos, SEEK_SET);
 
     if (!at_end)
         return preferred;
@@ -655,73 +656,6 @@ bitarray_read_sizeheader_(
         return 0;
 
     return bit_count;
-}
-
-long
-stream_towards_(
-    FILE* fp,
-    const long offset,
-    const int whence
-)
-{
-    const long current_pos = ftell(fp);
-
-    if (fseek(fp, offset, whence))
-        return -1;
-
-    return current_pos;
-}
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-function"
-long
-stream_begin_(
-    FILE* fp
-)
-{
-    return stream_towards_(fp, 0, SEEK_SET);
-}
-#pragma clang diagnostic pop
-
-long
-stream_end_(
-    FILE* fp
-)
-{
-    return stream_towards_(fp, 0, SEEK_END);
-}
-
-long
-stream_tell_size_(
-    FILE* fp
-)
-{
-    const long initial = stream_end_(fp);
-
-    // Failure in moving to end of stream
-    if (initial < 0)
-        return initial;
-
-    // Restore initial position and return the position at the end (length)
-    return stream_towards_(fp, initial, SEEK_SET);
-}
-
-long
-stream_tell_remaining_size_(
-    FILE* fp
-)
-{
-    const long start = stream_end_(fp);
-
-    if (start < 0)
-        return start;
-
-    const long end = stream_towards_(fp, start, SEEK_SET);
-
-    if (end < 0)
-        return end;
-
-    return end - start;
 }
 
 // --- END LOCAL IMPLEMENTATIONS --- //
