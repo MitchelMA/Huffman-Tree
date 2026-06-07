@@ -40,6 +40,7 @@ void bitarray_clean(bitarray* bitarray);
 bool bitarray_append_bit(bitarray* bitarray, bool value);
 
 int bitarray_value_at(const bitarray* bitarray, bitarray_length_t index);
+int64_t bitarray_read_bits(const bitarray* bitarray, bitarray_length_t index, bitarray_length_t count, bool* out);
 
 bitarray_length_t bitarray_length(const bitarray* bitarray);
 

@@ -154,6 +154,35 @@ bitarray_value_at(
     return ret;
 }
 
+int64_t
+bitarray_read_bits(
+    const bitarray* bitarray,
+    bitarray_length_t index,
+    bitarray_length_t count,
+    bool* out
+)
+{
+    int64_t ret = 1;
+
+    if (bitarray == NULL || out == NULL)
+        return ret;
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            TODO("reading bits from index for count amount not implemented for in-memory bitarray");
+        break;
+        case BITARRAY_IO_BUFFERED:
+            TODO("reading bits from index for count amount not implemented for io-buffered bitarray");
+        break;
+        default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
+    }
+
+    return ret;
+}
+
 bitarray_length_t
 bitarray_length(
     const bitarray* bitarray
