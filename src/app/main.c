@@ -91,32 +91,23 @@ void print_bitarr(const bitarray* bitarray)
 
         printf("%d", buff[i]);
     }
-    printf(" (%d)", length);
+    printf(" (%d)(%d)", length, succesful_read);
 
     free(buff);
 }
 
-int main(void)
+void print_bitarr_old(const bitarray* bitarray)
 {
-    bitarray arr = {0};
-    bitarray_init_in_mem(&arr);
+    const int64_t length = MIN(bitarray_length(bitarray), 10'000);
 
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 0);
-    bitarray_append_bit(&arr, 0);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 0);
-    bitarray_append_bit(&arr, 1);
-    bitarray_append_bit(&arr, 0);
-    print_bitarr(&arr);
-    puts("");
-
-    bitarray_clean(&arr);
+    for (int64_t i = 0; i < length; ++i)
+    {
+        printf("%d", bitarray_value_at(bitarray, i));
+    }
+    printf(" (%d)", length);
 }
 
-int main5(void)
+int main(void)
 {
     huffman_node tree_root = {0};
     bitarray arr = {0};

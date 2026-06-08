@@ -4,5 +4,7 @@
 #define MAX(A_, B_) ((A_) > (B_) ? (A_) : (B_))
 #define MIN(A_, B_) ((A_) > (B_) ? (B_) : (A_))
 
+#define UNUSED(A) ((void) (A))
+
 #endif // !HUFFMAN_HUFFMAN_UTILITY_H
 
