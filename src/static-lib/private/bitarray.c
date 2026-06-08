@@ -32,6 +32,8 @@ static bool bitarray_append_bit_impl__io_(bitarray* bitarray, bool value);
 static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_length_t index);
 static int bitarray_value_at_impl__io_(const bitarray* bitarray, bitarray_length_t index);
 
+static int64_t bitarray_read_bits_impl__mem_(const bitarray* bitarray, bitarray_length_t index, bitarray_length_t count, bool* out);
+
 static bitarray_length_t bitarray_length_impl__mem_(const bitarray* bitarray);
 static bitarray_length_t bitarray_length_impl__io_(const bitarray* bitarray);
 
@@ -162,7 +164,7 @@ bitarray_read_bits(
     bool* out
 )
 {
-    int64_t ret = 1;
+    int64_t ret = -1;
 
     if (bitarray == NULL || out == NULL)
         return ret;
@@ -170,7 +172,8 @@ bitarray_read_bits(
     switch (bitarray->kind)
     {
         case BITARRAY_IN_MEM:
-            TODO("reading bits from index for count amount not implemented for in-memory bitarray");
+            ret = bitarray_read_bits_impl__mem_(bitarray, index, count, out);
+            // TODO("reading bits from index for count amount not implemented for in-memory bitarray");
         break;
         case BITARRAY_IO_BUFFERED:
             TODO("reading bits from index for count amount not implemented for io-buffered bitarray");
@@ -438,6 +441,40 @@ bitarray_value_at_impl__io_(
     container = container & lower_mask;
 
     return (container >> bit_index) & 1;
+}
+
+int64_t
+bitarray_read_bits_impl__mem_(
+    const bitarray* bitarray,
+    bitarray_length_t index,
+    bitarray_length_t count,
+    bool* out
+)
+{
+    // First test if index + count is within the bounds of the array
+    const bitarray_length_t bitarr_length = bitarray_length(bitarray);
+    const int64_t           offset_range  = (int64_t) bitarr_length - (int64_t) index;
+
+    if (count > (bitarray_length_t) offset_range)
+        return -1;
+
+    // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
+    const int64_t  container_index     = MAX(BYTE_FILLING_COUNT_(index), 1) - 1;
+    const uint8_t  starting_bit_offset = BIT_REST_COUNT_(index);
+    const uint8_t* mem_buffer          = (uint8_t*) vector_get_start_addr_(bitarray->in_mem.content);
+
+    // Calculate local byte/bit offsets and write to the output buffer
+    for (bitarray_length_t i = 0; i < count; ++i)
+    {
+        const uint8_t local_bit_offset       = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(starting_bit_offset + i);
+        const int64_t local_container_offset = container_index + BYTE_FILLING_COUNT_(starting_bit_offset + i);
+        const uint8_t container              = mem_buffer[local_container_offset];
+        const bool    bit_value              = (container >> local_bit_offset) & 1;
+
+        out[i] = (bool) bit_value;
+    }
+
+    return count;
 }
 
 bitarray_length_t

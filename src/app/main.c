@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "utility.h"
 #include "huffman_node.h"
 #include "huffman_processing.h"
 #include "bitarray.h"
@@ -77,18 +78,45 @@ void print_uncompressed_text(const uint8_t* text)
 void print_bitarr(const bitarray* bitarray)
 {
     int64_t length = bitarray_length(bitarray);
-    for (int64_t i = 0; i < length; i++)
+    int64_t read_length = MIN(length, 10'000);
+    bool* buff = malloc(read_length * sizeof(bool));
+    const int offset = 0;
+
+    int64_t succesful_read = bitarray_read_bits(bitarray, offset, read_length - offset, buff);
+
+    for (int64_t i = 0; i < succesful_read; ++i)
     {
         if (i % 8 == 0 && i != 0)
             printf("");
 
-        printf("%d", bitarray_value_at(bitarray, i));
+        printf("%d", buff[i]);
     }
+    printf(" (%d)", length);
 
-    printf(" (%d)", bitarray_length(bitarray));
+    free(buff);
 }
 
 int main(void)
+{
+    bitarray arr = {0};
+    bitarray_init_in_mem(&arr);
+
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 0);
+    bitarray_append_bit(&arr, 0);
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 0);
+    bitarray_append_bit(&arr, 1);
+    bitarray_append_bit(&arr, 0);
+    print_bitarr(&arr);
+    puts("");
+
+    bitarray_clean(&arr);
+}
+
+int main5(void)
 {
     huffman_node tree_root = {0};
     bitarray arr = {0};
