@@ -131,6 +131,35 @@ bitarray_append_bit(
     return ret;
 }
 
+int64_t
+bitarray_append_bits(
+    const bitarray* bitarray,
+    bitarray_length_t count,
+    bool* buffer
+)
+{
+    int64_t ret = -1;
+
+    if (bitarray == NULL)
+        return ret;
+
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            TODO("Appending a buffer of a given length onto a in-memory bitarray is not yet implemented");
+        break;
+        case BITARRAY_IO_BUFFERED:
+            TODO("Appending a buffer of a given length onto a io-buffered bitarray is not yet implemented");
+        break;
+        default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
+    }
+
+    return ret;
+}
+
 int
 bitarray_value_at(
     const bitarray* bitarray,
