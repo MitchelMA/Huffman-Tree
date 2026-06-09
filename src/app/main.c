@@ -9,6 +9,8 @@
 #include "bitarray.h"
 #include "io.h"
 
+#define COUNTOF(ARR) ((&(ARR))[1] - (ARR))
+
 static const uint8_t* test_text = u8"this is an example of a huffman tree";
 // static const uint8_t* test_text_back = u8"this is an example of a huffman treeloprloprhimnst";
 
@@ -108,6 +110,26 @@ void print_bitarr_old(const bitarray* bitarray)
 }
 
 int main(void)
+{
+    const bool boolarr[] = { 0, 1, 1, 0, 1, 1 };
+    bitarray bitarr = {0};
+
+    bitarray_init_in_mem(&bitarr);
+    bitarray_append_bit(&bitarr, 1);
+    bitarray_append_bit(&bitarr, 1);
+    const int64_t written = bitarray_append_bits(&bitarr, COUNTOF(boolarr), boolarr);
+
+    printf("wrote: %ld\n", written);
+
+    print_bitarr(&bitarr);
+    puts("");
+
+    bitarray_clean(&bitarr);
+
+    return EXIT_SUCCESS;
+}
+
+int main5(void)
 {
     huffman_node tree_root = {0};
     bitarray arr = {0};

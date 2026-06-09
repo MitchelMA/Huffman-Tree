@@ -38,7 +38,7 @@ bool bitarray_init_io_buffered(bitarray* bitarray, FILE* fp);
 void bitarray_clean(bitarray* bitarray);
 
 bool bitarray_append_bit(bitarray* bitarray, bool value);
-int64_t bitarray_append_bits(const bitarray* bitarray, bitarray_length_t count, bool* buffer);
+int64_t bitarray_append_bits(bitarray* bitarray, bitarray_length_t count, const bool* buffer);
 
 int bitarray_value_at(const bitarray* bitarray, bitarray_length_t index);
 int64_t bitarray_read_bits(const bitarray* bitarray, bitarray_length_t index, bitarray_length_t count, bool* out);

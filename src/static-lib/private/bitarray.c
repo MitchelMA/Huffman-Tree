@@ -30,6 +30,8 @@ static void bitarray_clean_impl__io_(bitarray* bitarray);
 static bool bitarray_append_bit_impl__mem_(bitarray* bitarray, bool value);
 static bool bitarray_append_bit_impl__io_(bitarray* bitarray, bool value);
 
+static int64_t bitarray_append_bits_impl__mem_(bitarray* bitarray, bitarray_length_t count, const bool* buffer);
+
 static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_length_t index);
 static int bitarray_value_at_impl__io_(const bitarray* bitarray, bitarray_length_t index);
 
@@ -133,21 +135,20 @@ bitarray_append_bit(
 
 int64_t
 bitarray_append_bits(
-    const bitarray* bitarray,
-    bitarray_length_t count,
-    bool* buffer
+    bitarray* bitarray,
+    const bitarray_length_t count,
+    const bool* buffer
 )
 {
     int64_t ret = -1;
 
-    if (bitarray == NULL)
+    if (bitarray == NULL || buffer == NULL)
         return ret;
-
 
     switch (bitarray->kind)
     {
         case BITARRAY_IN_MEM:
-            TODO("Appending a buffer of a given length onto a in-memory bitarray is not yet implemented");
+            ret = bitarray_append_bits_impl__mem_(bitarray, count, buffer);
         break;
         case BITARRAY_IO_BUFFERED:
             TODO("Appending a buffer of a given length onto a io-buffered bitarray is not yet implemented");
@@ -406,6 +407,49 @@ bitarray_append_bit_impl__io_(
 
     bitarray->buffered.bit_offset = BIT_REST_COUNT_(next_offset_count);
     return true;
+}
+
+int64_t
+bitarray_append_bits_impl__mem_(
+    bitarray* bitarray,
+    const bitarray_length_t count,
+    const bool* buffer
+)
+{
+    int64_t written = 0;
+
+    while ((bitarray_length_t) written < count)
+    {
+        // Check wether a new container needs to be allocated
+        if (bitarray->in_mem.bit_offset == 0)
+            vector_append(bitarray->in_mem.content, &empty_container_);
+
+        // Get the last container
+        bitarray_bitcontainer_t* container = NULL;
+        if (!vector_elem_at(
+            bitarray->in_mem.content,
+            vector_get_elem_count(bitarray->in_mem.content) - 1,
+            (void**)&container))
+            break;
+
+        // Write to the last container with the correct offsets
+        while ((bitarray_length_t) written < count)
+        {
+            const bitarray_bitcontainer_t container_write_offset = (BITS_IN_BYTE_ - 1) - bitarray->in_mem.bit_offset;
+            const bitarray_bitcontainer_t to_be_written = buffer[written] << container_write_offset;
+
+            // Write the value into the container and update the bit-offset
+            *container |= to_be_written;
+            bitarray->in_mem.bit_offset = BIT_REST_COUNT_(bitarray->in_mem.bit_offset + 1);
+            ++written;
+
+            // When the bit-offset is 0, break out of the inner loop
+            if (bitarray->in_mem.bit_offset == 0)
+                break;
+        }
+    }
+
+    return written;
 }
 
 int
