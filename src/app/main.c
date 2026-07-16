@@ -113,8 +113,9 @@ int main(void)
 {
     const bool boolarr[] = { 0, 1, 1, 0, 1, 1 };
     bitarray bitarr = {0};
+    FILE* fp = open_file_write("./bitarr_buff");
 
-    bitarray_init_in_mem(&bitarr);
+    bitarray_init_io_buffered(&bitarr, fp);
     bitarray_append_bit(&bitarr, 1);
     bitarray_append_bit(&bitarr, 1);
     const int64_t written = bitarray_append_bits(&bitarr, COUNTOF(boolarr), boolarr);
