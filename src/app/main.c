@@ -109,7 +109,7 @@ void print_bitarr_old(const bitarray* bitarray)
     printf(" (%d)", length);
 }
 
-int main(void)
+int main5(void)
 {
     const bool boolarr[] = { 0, 1, 1, 0, 1, 1 };
     bitarray bitarr = {0};
@@ -130,7 +130,7 @@ int main(void)
     return EXIT_SUCCESS;
 }
 
-int main5(void)
+int main(void)
 {
     huffman_node tree_root = {0};
     bitarray arr = {0};

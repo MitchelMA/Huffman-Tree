@@ -7,6 +7,17 @@
 
 // --- LOCAL DEFINITIONS --- //
 
+#define ARRAY_REVERSE_(type_, arr_, len_) \
+do { \
+    type_ old_ = {}; \
+    for (int64_t i_ = 0; i_ < len_/2; i_++) \
+    { \
+        old_ = arr_[i_]; \
+        arr_[i_] = arr_[len_ - 1 - i_]; \
+        arr_[len_ - 1 - i_] = old_; \
+    } \
+} while (0)
+
 static int compare_symbol_(const void* a, const void* b);
 
 static dlinked_list_node* doublyll_create_(void);
@@ -171,11 +182,11 @@ huffman_compress(
     {
         int64_t path_len = 0;
         bool* path = huffman_node_path(root, buffer[idx], &path_len);
-        while (path_len-- > 0)
-        {
-            bitarray_append_bit(out_bitarray, path[path_len]);
-            processed++;
-        }
+        ARRAY_REVERSE_(bool, path, path_len);
+        int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
+        processed += appended;
+        if (appended < path_len)
+            return processed;
     }
 
     return processed;
@@ -198,11 +209,11 @@ huffman_compress_stream(
     {
         int64_t path_len = 0;
         bool* path = huffman_node_path(root, (uint8_t)symbol, &path_len);
-        while (path_len-- > 0)
-        {
-            bitarray_append_bit(out_bitarray, path[path_len]);
-            processed++;
-        }
+        ARRAY_REVERSE_(bool, path, path_len);
+        int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
+        processed += appended;
+        if (appended < path_len)
+            return processed;
     }
 
     return processed;
