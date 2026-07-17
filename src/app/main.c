@@ -3,10 +3,13 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "utility.h"
 #include "huffman_node.h"
 #include "huffman_processing.h"
 #include "bitarray.h"
 #include "io.h"
+
+#define COUNTOF(ARR) ((&(ARR))[1] - (ARR))
 
 static const uint8_t* test_text = u8"this is an example of a huffman tree";
 // static const uint8_t* test_text_back = u8"this is an example of a huffman treeloprloprhimnst";
@@ -77,15 +80,54 @@ void print_uncompressed_text(const uint8_t* text)
 void print_bitarr(const bitarray* bitarray)
 {
     int64_t length = bitarray_length(bitarray);
-    for (int64_t i = 0; i < length; i++)
+    int64_t read_length = MIN(length, 10'000);
+    bool* buff = malloc(read_length * sizeof(bool));
+    const int offset = 0;
+
+    int64_t succesful_read = bitarray_read_bits(bitarray, offset, read_length - offset, buff);
+
+    for (int64_t i = 0; i < succesful_read; ++i)
     {
         if (i % 8 == 0 && i != 0)
             printf("");
 
+        printf("%d", buff[i]);
+    }
+    printf(" (%d)(%d)", length, succesful_read);
+
+    free(buff);
+}
+
+void print_bitarr_old(const bitarray* bitarray)
+{
+    const int64_t length = MIN(bitarray_length(bitarray), 10'000);
+
+    for (int64_t i = 0; i < length; ++i)
+    {
         printf("%d", bitarray_value_at(bitarray, i));
     }
+    printf(" (%d)", length);
+}
 
-    printf(" (%d)", bitarray_length(bitarray));
+int main5(void)
+{
+    const bool boolarr[] = { 0, 1, 1, 0, 1, 1 };
+    bitarray bitarr = {0};
+    FILE* fp = open_file_write("./bitarr_buff");
+
+    bitarray_init_io_buffered(&bitarr, fp);
+    bitarray_append_bit(&bitarr, 1);
+    bitarray_append_bit(&bitarr, 1);
+    const int64_t written = bitarray_append_bits(&bitarr, COUNTOF(boolarr), boolarr);
+
+    printf("wrote: %ld\n", written);
+
+    print_bitarr(&bitarr);
+    puts("");
+
+    bitarray_clean(&bitarr);
+
+    return EXIT_SUCCESS;
 }
 
 int main(void)

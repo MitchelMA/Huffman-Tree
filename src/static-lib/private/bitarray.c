@@ -4,6 +4,7 @@
 #include "io.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 
 // --- LOCAL DEFINITIONS --- //
@@ -29,8 +30,14 @@ static void bitarray_clean_impl__io_(bitarray* bitarray);
 static bool bitarray_append_bit_impl__mem_(bitarray* bitarray, bool value);
 static bool bitarray_append_bit_impl__io_(bitarray* bitarray, bool value);
 
+static int64_t bitarray_append_bits_impl__mem_(bitarray* bitarray, bitarray_length_t count, const bool* buffer);
+static int64_t bitarray_append_bits_impl__io_(bitarray* bitarray, bitarray_length_t count, const bool* buffer);
+
 static int bitarray_value_at_impl__mem_(const bitarray* bitarray, bitarray_length_t index);
 static int bitarray_value_at_impl__io_(const bitarray* bitarray, bitarray_length_t index);
+
+static int64_t bitarray_read_bits_impl__mem_(const bitarray* bitarray, bitarray_length_t length, bitarray_length_t index, bitarray_length_t count, bool* out);
+static int64_t bitarray_read_bits_impl__io_(const bitarray* bitarray, bitarray_length_t length, bitarray_length_t index, bitarray_length_t count, bool* out);
 
 static bitarray_length_t bitarray_length_impl__mem_(const bitarray* bitarray);
 static bitarray_length_t bitarray_length_impl__io_(const bitarray* bitarray);
@@ -127,6 +134,34 @@ bitarray_append_bit(
     return ret;
 }
 
+int64_t
+bitarray_append_bits(
+    bitarray* bitarray,
+    const bitarray_length_t count,
+    const bool* buffer
+)
+{
+    int64_t ret = -1;
+
+    if (bitarray == NULL || buffer == NULL)
+        return ret;
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            ret = bitarray_append_bits_impl__mem_(bitarray, count, buffer);
+        break;
+        case BITARRAY_IO_BUFFERED:
+            ret = bitarray_append_bits_impl__io_(bitarray, count, buffer);
+        break;
+        default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
+    }
+
+    return ret;
+}
+
 int
 bitarray_value_at(
     const bitarray* bitarray,
@@ -145,6 +180,42 @@ bitarray_value_at(
         break;
         case BITARRAY_IO_BUFFERED:
             ret = bitarray_value_at_impl__io_(bitarray, index);
+        break;
+        default:
+            SWITCH_EXHAUST_DEFAULT;
+        break;
+    }
+
+    return ret;
+}
+
+int64_t
+bitarray_read_bits(
+    const bitarray* bitarray,
+    const bitarray_length_t index,
+    const bitarray_length_t count,
+    bool* out
+)
+{
+    int64_t ret = -1;
+
+    if (bitarray == NULL || out == NULL)
+        return ret;
+
+    // First test if index + count is within the bounds of the array
+    const bitarray_length_t bitarr_length = bitarray_length(bitarray);
+    const int64_t           offset_range  = (int64_t) bitarr_length - (int64_t) index;
+
+    if (count > (bitarray_length_t) offset_range)
+        return ret;
+
+    switch (bitarray->kind)
+    {
+        case BITARRAY_IN_MEM:
+            ret = bitarray_read_bits_impl__mem_(bitarray, bitarr_length, index, count, out);
+        break;
+        case BITARRAY_IO_BUFFERED:
+            ret = bitarray_read_bits_impl__io_(bitarray, bitarr_length, index, count, out);
         break;
         default:
             SWITCH_EXHAUST_DEFAULT;
@@ -339,6 +410,69 @@ bitarray_append_bit_impl__io_(
     return true;
 }
 
+int64_t
+bitarray_append_bits_impl__mem_(
+    bitarray* bitarray,
+    const bitarray_length_t count,
+    const bool* buffer
+)
+{
+    int64_t written = 0;
+
+    while ((bitarray_length_t) written < count)
+    {
+        // Check wether a new container needs to be allocated
+        if (bitarray->in_mem.bit_offset == 0)
+            vector_append(bitarray->in_mem.content, &empty_container_);
+
+        // Get the last container
+        bitarray_bitcontainer_t* container = NULL;
+        if (!vector_elem_at(
+            bitarray->in_mem.content,
+            vector_get_elem_count(bitarray->in_mem.content) - 1,
+            (void**)&container))
+            break;
+
+        // Write to the last container with the correct offsets
+        while ((bitarray_length_t) written < count)
+        {
+            const bitarray_bitcontainer_t container_write_offset = (BITS_IN_BYTE_ - 1) - bitarray->in_mem.bit_offset;
+            const bitarray_bitcontainer_t to_be_written = buffer[written] << container_write_offset;
+
+            // Write the value into the container and update the bit-offset
+            *container |= to_be_written;
+            bitarray->in_mem.bit_offset = BIT_REST_COUNT_(bitarray->in_mem.bit_offset + 1);
+            ++written;
+
+            // When the bit-offset is 0, break out of the inner loop
+            if (bitarray->in_mem.bit_offset == 0)
+                break;
+        }
+    }
+
+    return written;
+}
+
+int64_t
+bitarray_append_bits_impl__io_(
+    bitarray* bitarray,
+    const bitarray_length_t count,
+    const bool* buffer
+)
+{
+    int64_t written = 0;
+
+    while ((bitarray_length_t) written < count)
+    {
+        if (bitarray_append_bit_impl__io_(bitarray, buffer[written]))
+            written++;
+        else
+            break;
+    }
+
+    return written;
+}
+
 int
 bitarray_value_at_impl__mem_(
     const bitarray* bitarray,
@@ -409,6 +543,108 @@ bitarray_value_at_impl__io_(
     container = container & lower_mask;
 
     return (container >> bit_index) & 1;
+}
+
+int64_t
+bitarray_read_bits_impl__mem_(
+    const bitarray* bitarray,
+    const bitarray_length_t length,
+    const bitarray_length_t index,
+    const bitarray_length_t count,
+    bool* out
+)
+{
+    UNUSED(length);
+
+    // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
+    const int64_t  container_index     = MAX(BYTE_FILLING_COUNT_(index), 1) - 1;
+    const uint8_t  starting_bit_offset = BIT_REST_COUNT_(index);
+    const uint8_t* mem_buffer          = (uint8_t*) vector_get_start_addr_(bitarray->in_mem.content);
+
+    // Calculate local byte/bit offsets and write to the output buffer
+    for (bitarray_length_t i = 0; i < count; ++i)
+    {
+        const uint8_t local_bit_offset       = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(starting_bit_offset + i);
+        const int64_t local_container_offset = container_index + BYTE_FILLING_COUNT_(starting_bit_offset + i);
+        const uint8_t container              = mem_buffer[local_container_offset];
+        const bool    bit_value              = (container >> local_bit_offset) & 1;
+
+        out[i] = (bool) bit_value;
+    }
+
+    return count;
+}
+
+int64_t
+bitarray_read_bits_impl__io_(
+    const bitarray* bitarray,
+    const bitarray_length_t length,
+    const bitarray_length_t index,
+    const bitarray_length_t count,
+    bool* out
+)
+{
+    // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
+    const int64_t stream_bit_count    = length - bitarray->buffered.bit_offset;
+    const int64_t container_index     = MAX(BYTE_FILLING_COUNT_(index), 1) - 1;
+    const uint8_t starting_bit_offset = BIT_REST_COUNT_(index);
+
+    int64_t already_read = 0;
+
+    // When the index falls in the bits in the stream, read from the stream
+    if (index < (bitarray_length_t) stream_bit_count) {
+        // Move the cursor in the stream
+        const long initial_pos = stream_towards(bitarray->buffered.file, container_index, SEEK_SET);
+
+        const int64_t stream_remaining_bit_count = stream_bit_count - index;
+        const int64_t stream_remining_byte_count = REQ_BYTE_COUNT_(stream_remaining_bit_count);
+
+        // Allocate a temp buffer and transfer bytes from stream to the in-mem buffer
+        uint8_t* mem_buff = malloc(sizeof(uint8_t) * stream_remining_byte_count);
+        if (mem_buff == NULL)
+            return -1;
+
+        const size_t file_read_count = fread(
+            mem_buff,
+            sizeof(uint8_t),
+            stream_remining_byte_count,
+            bitarray->buffered.file
+        );
+
+        if (file_read_count < (size_t) stream_remining_byte_count)
+        {
+            free(mem_buff);
+            return -1;
+        }
+
+        // Restore the stream cursor
+        stream_towards(bitarray->buffered.file, initial_pos, SEEK_SET);
+
+        // Write from the in-mem buffer to the output buffer
+        for (; (bitarray_length_t) already_read < count && already_read < stream_remaining_bit_count; already_read++)
+        {
+            const uint8_t local_bit_offset       = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(starting_bit_offset + already_read);
+            const int64_t local_container_offset = BYTE_FILLING_COUNT_(already_read);
+            const uint8_t container              = mem_buff[local_container_offset];
+            const bool    bit_value              = (container >> local_bit_offset) & 1;
+
+            out[already_read] = (bool) bit_value;
+        }
+
+        // Free the in-mem buffer
+        free(mem_buff);
+    }
+
+    // When available, read from the bitarray buffer to the output buffer
+    for (; (bitarray_length_t) already_read < count; already_read++)
+    {
+        const uint8_t local_bit_offset = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(starting_bit_offset + already_read);
+        const bool    bit_value        = (bitarray->buffered.io_buffer >> local_bit_offset) & 1;
+
+        out[already_read] = bit_value;
+    }
+
+    return already_read;
 }
 
 bitarray_length_t
