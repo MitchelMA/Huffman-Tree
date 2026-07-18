@@ -1,22 +1,13 @@
 #include "huffman_processing.h"
 
+#include "utility.h"
+
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 
 
 // --- LOCAL DEFINITIONS --- //
-
-#define ARRAY_REVERSE_(type_, arr_, len_) \
-do { \
-    type_ old_ = {}; \
-    for (int64_t i_ = 0; i_ < len_/2; i_++) \
-    { \
-        old_ = arr_[i_]; \
-        arr_[i_] = arr_[len_ - 1 - i_]; \
-        arr_[len_ - 1 - i_] = old_; \
-    } \
-} while (0)
 
 static int compare_symbol_(const void* a, const void* b);
 
@@ -182,7 +173,7 @@ huffman_compress(
     {
         int64_t path_len = 0;
         bool* path = huffman_node_path(root, buffer[idx], &path_len);
-        ARRAY_REVERSE_(bool, path, path_len);
+        ARRAY_REVERSE(bool, path, path_len);
         int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
         processed += appended;
         if (appended < path_len)
@@ -209,7 +200,7 @@ huffman_compress_stream(
     {
         int64_t path_len = 0;
         bool* path = huffman_node_path(root, (uint8_t)symbol, &path_len);
-        ARRAY_REVERSE_(bool, path, path_len);
+        ARRAY_REVERSE(bool, path, path_len);
         int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
         processed += appended;
         if (appended < path_len)
@@ -236,8 +227,11 @@ huffman_decompress(
 
     for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
     {
-        bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
-        path = huffman_node_traverse(path, bit);
+        if (path->is_branching)
+        {
+            bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
+            path = huffman_node_traverse(path, bit);
+        }
 
         if (path == NULL)
             break;
@@ -273,8 +267,11 @@ huffman_decompress_stream(
 
     for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
     {
-        bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
-        path = huffman_node_traverse(path, bit);
+        if (path->is_branching)
+        {
+            bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
+            path = huffman_node_traverse(path, bit);
+        }
 
         if (path == NULL)
             break;
