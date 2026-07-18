@@ -249,8 +249,19 @@ huffman_node_path_impl_(
     int64_t* len
 )
 {
-    if (root == NULL || !root->is_branching)
+    if (root == NULL)
         return false;
+
+    if (!root->is_branching)
+    {
+        if (huffman_node_path_inner_(root, val, path, len))
+        {
+            path[(*len)++] = HUFFMAN_BRANCH_RIGHT;
+            return true;
+        }
+
+        return false;
+    }
 
     if (huffman_node_path_inner_(root->branching.left, val, path, len))
     {
