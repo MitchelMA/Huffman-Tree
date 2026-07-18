@@ -30,6 +30,10 @@ static dlinked_list_node* doublyll_insert_or_update_(dlinked_list_node* root, ui
 
 static uint8_t* calculate_consecutive_(uint8_t* start, uint8_t* last, huffman_node* output);
 
+static bool compress_symbol_(const huffman_node* root, uint8_t symbol, bool* out_buffer, size_t buffer_size, bitarray_length_t* out_processed);
+static int64_t compress_symbols_buffer_(const huffman_node* root, const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
+static int64_t compress_symbols_io_(const huffman_node* root, FILE* in_stream, bitarray* out_bitarray, bitarray_length_t* out_processed);
+
 // --- END LOCAL DEFINITIONS --- //
 
 dlinked_list_node*
@@ -169,15 +173,18 @@ huffman_compress(
         return 0;
 
     bitarray_length_t processed = 0;
-    for (size_t idx = 0; idx < buffer_size; idx++)
+    size_t buffer_idx = 0;
+    while (buffer_idx < buffer_size)
     {
-        int64_t path_len = 0;
-        bool* path = huffman_node_path(root, buffer[idx], &path_len);
-        ARRAY_REVERSE(bool, path, path_len);
-        int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
-        processed += appended;
-        if (appended < path_len)
-            return processed;
+        bitarray_length_t bits_appended = 0;
+        buffer_idx += compress_symbols_buffer_(
+            root,
+            (buffer + buffer_idx),
+            (buffer_size - buffer_idx),
+            out_bitarray,
+            &bits_appended
+        );
+        processed += bits_appended;
     }
 
     return processed;
@@ -194,18 +201,20 @@ huffman_compress_stream(
         return 0;
 
     bitarray_length_t processed = 0;
-    int symbol = EOF;
+    bitarray_length_t bits_appended = 0;
+    int64_t advanced = 0;
 
-    while ((symbol = fgetc(in_stream)) != EOF)
+    do
     {
-        int64_t path_len = 0;
-        bool* path = huffman_node_path(root, (uint8_t)symbol, &path_len);
-        ARRAY_REVERSE(bool, path, path_len);
-        int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
-        processed += appended;
-        if (appended < path_len)
-            return processed;
-    }
+         advanced = compress_symbols_io_(
+            root,
+            in_stream,
+            out_bitarray,
+            &bits_appended
+        );
+
+        processed += bits_appended;
+    } while (advanced > 0);
 
     return processed;
 }
@@ -581,6 +590,101 @@ calculate_consecutive_(
     }
 
     return current;
+}
+
+
+bool
+compress_symbol_(
+    const huffman_node* root,
+    const uint8_t symbol,
+    bool* out_buffer,
+    const size_t buffer_size,
+    bitarray_length_t* out_processed
+)
+{
+    int64_t path_len = 0;
+    bool* path = huffman_node_path(root, symbol, &path_len);
+    if ((size_t) path_len > buffer_size)
+        return false;
+
+    while (path_len-- > 0)
+        out_buffer[(*out_processed)++] = path[path_len];
+
+    return true;
+}
+
+int64_t
+compress_symbols_buffer_(
+    const huffman_node* root,
+    const uint8_t* buffer,
+    const size_t buffer_size,
+    bitarray* out_bitarray,
+    bitarray_length_t* out_processed
+)
+{
+    int64_t symbols_advanced = 0;
+
+    #define process_buffer_size 1024 * 5
+    bool process_buffer[process_buffer_size] = {0};
+
+    // read into the process buffer
+    int64_t read_into_process_buffer = 0;
+    for (int64_t i = 0; (size_t) i < buffer_size; i++)
+    {
+        bitarray_length_t processed = 0;
+        if (!compress_symbol_(root,
+            buffer[i],
+            (process_buffer + read_into_process_buffer),
+            (process_buffer_size - read_into_process_buffer),
+            &processed))
+            break;
+
+        read_into_process_buffer += processed;
+        symbols_advanced++;
+    }
+
+    // insert the booleans into the out bitarray
+    *out_processed = bitarray_append_bits(out_bitarray, read_into_process_buffer, process_buffer);
+    return symbols_advanced;
+    #undef process_buffer_size
+}
+
+
+int64_t
+compress_symbols_io_(
+    const huffman_node* root,
+    FILE* in_stream,
+    bitarray* out_bitarray,
+    bitarray_length_t* out_processed
+)
+{
+    int64_t symbols_advanced = 0;
+    #define process_buffer_size (1024 * 10)
+    bool process_buffer[process_buffer_size] = {0};
+
+    int64_t read_into_process_buffer = 0;
+    int symbol = EOF;
+
+    while ((symbol = fgetc(in_stream)) != EOF)
+    {
+        bitarray_length_t processed = 0;
+        if (!compress_symbol_(root,
+            (uint8_t)symbol,
+            (process_buffer + read_into_process_buffer),
+            (process_buffer_size - read_into_process_buffer),
+            &processed))
+        {
+            ungetc(symbol, in_stream);
+            break;
+        }
+
+        read_into_process_buffer += processed;
+        symbols_advanced++;
+    }
+
+    *out_processed = bitarray_append_bits(out_bitarray, read_into_process_buffer, process_buffer);
+    return symbols_advanced;
+    #undef process_buffer_size
 }
 
 // --- END LOCAL DEFINITIONS --- //
