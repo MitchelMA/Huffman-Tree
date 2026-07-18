@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <locale.h>
 
 #include "utility.h"
 #include "huffman_node.h"
 #include "huffman_processing.h"
 #include "bitarray.h"
 #include "io.h"
+
+#include "timer.h"
 
 #define COUNTOF(ARR) ((&(ARR))[1] - (ARR))
 
@@ -132,6 +135,8 @@ int main5(void)
 
 int main(void)
 {
+    setlocale(LC_ALL, "");
+    struct timer duration_timer = {};
     huffman_node tree_root = {0};
     bitarray arr = {0};
     const char* text_filename;
@@ -144,10 +149,14 @@ int main(void)
     text_fp  = open_file_read(text_filename);
     puts("Opened text file");
 
+    start_timer(&duration_timer);
     dlinked_list_node* counted_nodes = huffman_count_stream_onepass(text_fp);
+    end_timer(&duration_timer);
+
     rewind(text_fp);
     puts("Parsed for symbol-count:");
     doublyll_print(counted_nodes);
+    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
 
     tree_root = huffman_construct_tree(counted_nodes);
     puts("Constructed tree");
@@ -158,11 +167,15 @@ int main(void)
     bitarray_init_io_buffered(&arr, bitarr_buf);
     // bitarray_init_in_mem(&arr);
 
+    start_timer(&duration_timer);
     const bitarray_length_t processed = huffman_compress_stream(&tree_root, text_fp, &arr);
+    end_timer(&duration_timer);
+
     const bitarray_length_t length = bitarray_length(&arr);
 
     printf("Compressed file (%llu bits)\n", processed);
     printf("compressed-length: %zu bytes\n", (length >> 3) + 1);
+    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
 
     print_bitarr(&arr);
     puts("");
@@ -186,10 +199,15 @@ int main(void)
     // Write the restored bitarray into output so we know the whole process was successful or not
     close_file(text_fp);
     text_fp = open_file_write("./output");
+
+    start_timer(&duration_timer);
     const size_t written = huffman_decompress_stream(&tree_root, &rest_arr, text_fp);
+    end_timer(&duration_timer);
+
     puts("Decompressed bitarray");
     printf("Written into stream: %zu bytes\n", written);
     printf("Reached compression-ratio of: %0.1f%%\n", (int64_t)(length - (written * 8)) / (float)(written * 8) * 100 );
+    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
 
     huffman_node_clean(&tree_root);
     close_file(text_fp);
