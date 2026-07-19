@@ -112,93 +112,6 @@ void print_bitarr_old(const bitarray* bitarray)
     printf(" (%d)", length);
 }
 
-int main7(void)
-{
-    setlocale(LC_ALL, "");
-    struct timer duration_timer = {};
-    huffman_node tree_root = {0};
-    bitarray arr = {0};
-    const char* text_filename;
-    FILE* text_fp    = NULL;
-
-    text_filename = "./input";
-    text_fp  = open_file_read(text_filename);
-
-    dlinked_list_node* counted_nodes = huffman_count_stream_onepass(text_fp);
-    rewind(text_fp);
-
-    tree_root = huffman_construct_tree(counted_nodes);
-
-    bitarray_init_in_mem(&arr);
-
-    const bitarray_length_t processed = huffman_compress_stream(&tree_root, text_fp, &arr);
-    rewind(text_fp);
-
-    const bitarray_length_t bit_arr_len = bitarray_length(&arr);
-    size_t stream_written = 0;
-    const huffman_node* path = &tree_root;
-
-    #define process_buffer_len (1 * 512)
-    bool process_buffer[process_buffer_len] = {0};
-    int64_t process_buffer_working_len = 0; 
-    bitarray_length_t process_buffer_index = 0;
-    bitarray_length_t bitarray_prolonged_index = 0;
-    int last_char = 0;
-
-    while (true)
-    {
-        if (bitarray_prolonged_index > 0)
-        {
-            printf("border-write: %c, %d, (%llu) - %d - %d\n", (char)last_char, last_char, stream_written, path == &tree_root, process_buffer_working_len);
-        }
-
-
-        bitarray_prolonged_index += process_buffer_working_len;
-        process_buffer_working_len = bitarray_read_bits(&arr,
-            bitarray_prolonged_index,
-            MIN(process_buffer_len, bit_arr_len - bitarray_prolonged_index),
-            process_buffer);
-
-        if (process_buffer_working_len <= 0)
-            break;
-
-        process_buffer_index = 0;
-
-        // process individual bits to resolve symbols
-
-        for (;
-            process_buffer_index < (bitarray_length_t) process_buffer_working_len;
-            process_buffer_index++)
-        {
-            if (path->is_branching)
-            {
-                bool bit = process_buffer[process_buffer_index];
-                bool supposed_value = bitarray_value_at(&arr, bitarray_prolonged_index + process_buffer_index);
-
-                // if (bit != supposed_value)
-                printf("Check - read: %d[%d], should-be: %d [%llu]\n", bit, process_buffer_index, supposed_value, bitarray_prolonged_index + process_buffer_index);
-
-                path = huffman_node_traverse(path, bit);
-            }
-
-            if (path == NULL)
-                return stream_written;
-
-            if (path->is_branching)
-                continue;
-
-            //if (fputc(path->leaf.val, out_stream) == EOF)
-            //    return stream_written;
-
-            last_char = path->leaf.val;
-            stream_written++;
-            path = &tree_root;
-        }
-    }
-
-    #undef process_buffer_len
-}
-
 int main5(void)
 {
     const bool boolarr[] = { 0, 1, 1, 0, 1, 1 };
@@ -245,8 +158,12 @@ int main(void)
     doublyll_print(counted_nodes);
     printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
 
+    start_timer(&duration_timer);
     tree_root = huffman_construct_tree(counted_nodes);
+    end_timer(&duration_timer);
+
     puts("Constructed tree");
+    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
     huffman_node_print_depth(&tree_root);
     puts("");
 

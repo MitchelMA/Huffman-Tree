@@ -227,7 +227,7 @@ do { \
         (path) = huffman_node_traverse((path), bit_); \
     } \
     if ((path) == NULL) \
-        return (stream_written); \
+        return (written); \
     if ((path)->is_branching) \
         continue; \
     writer \
@@ -235,12 +235,11 @@ do { \
     (path) = (root); \
 } while (0)
 
-
 size_t
 huffman_decompress(
     const huffman_node* root,
     const bitarray* bit_array,
-    size_t buffer_size,
+    const size_t buffer_size,
     uint8_t* buffer
 )
 {
@@ -251,33 +250,39 @@ huffman_decompress(
     size_t buffer_written = 0;
     const huffman_node* path = root;
 
-    for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
+    #define process_buffer_len (5 * 1024)
+    bool process_buffer[process_buffer_len] = {0};
+    int64_t process_buffer_working_len = 0;
+    bitarray_length_t process_buffer_index = 0;
+    bitarray_length_t bitarray_prolonged_index = 0;
+
+    while (buffer_written < (buffer_size - 1))
     {
-        if (path->is_branching)
+        bitarray_prolonged_index += process_buffer_working_len;
+        process_buffer_working_len = bitarray_read_bits(bit_array,
+            bitarray_prolonged_index,
+            MIN(process_buffer_len, bit_arr_len - bitarray_prolonged_index),
+            process_buffer);
+
+        if (process_buffer_working_len <= 0)
+            break;
+
+        process_buffer_index = 0;
+
+        for (; process_buffer_index < (bitarray_length_t) process_buffer_working_len &&
+            buffer_written < (buffer_size - 1);
+            process_buffer_index++)
         {
-            bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
-            path = huffman_node_traverse(path, bit);
+            decompress_(
+                path,
+                root,
+                process_buffer[process_buffer_index],
+                buffer[buffer_written] = path->leaf.val;,
+                buffer_written);
         }
-
-        if (path == NULL)
-            break;
-
-        if (path->is_branching)
-            continue;
-
-        if (buffer_written >= buffer_size - 1)
-            break;
-
-        buffer[buffer_written++] = path->leaf.val;
-        path = root;
-
-        // decompress_(
-        //     path,
-        //     root,
-        //     (bool)bitarray_value_at(bit_array, bit_idx),
-        //     stream_written,
-        //     out_stream);
     }
+
+    #undef process_buffer_len
 
     buffer[buffer_written] = '\0';
 
@@ -298,47 +303,14 @@ huffman_decompress_stream(
     size_t stream_written = 0;
     const huffman_node* path = root;
 
-    // for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
-    // {
-    //     if (path->is_branching)
-    //     {
-    //         bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
-    //         path = huffman_node_traverse(path, bit);
-    //     }
-
-    //     if (path == NULL)
-    //         break;
-
-    //     if (path->is_branching)
-    //         continue;
-
-    //     if (fputc(path->leaf.val, out_stream) == EOF)
-    //         return stream_written;
-
-    //     stream_written++;
-    //     path = root;
-    // }
-
-    // return stream_written;
-
     #define process_buffer_len (5 * 1024)
     bool process_buffer[process_buffer_len] = {0};
-    int64_t process_buffer_working_len = 0; 
+    int64_t process_buffer_working_len = 0;
     bitarray_length_t process_buffer_index = 0;
     bitarray_length_t bitarray_prolonged_index = 0;
-    int last_char = 0;
 
     while (true)
     {
-        // Read the bits into the buffer
-        // if (process_buffer_index >= (bitarray_length_t) process_buffer_working_len)
-        // {
-        // if (bitarray_prolonged_index > 0)
-        // {
-        //     printf("border-write: %c, %d, (%llu) - %d - %d\n", (char)last_char, last_char, stream_written, path == root, process_buffer_working_len);
-        // }
-
-
         bitarray_prolonged_index += process_buffer_working_len;
         process_buffer_working_len = bitarray_read_bits(bit_array,
             bitarray_prolonged_index,
@@ -349,46 +321,18 @@ huffman_decompress_stream(
             break;
 
         process_buffer_index = 0;
-        // }
 
-        // process individual bits to resolve symbols
-
-        for (;
-            process_buffer_index < (bitarray_length_t) process_buffer_working_len;
+        for (; process_buffer_index < (bitarray_length_t) process_buffer_working_len;
             process_buffer_index++)
         {
-            // decompress_(
-            //     path,
-            //     root,
-            //     process_buffer[process_buffer_index],
-            //     if (fputc(path->leaf.val, out_stream) == EOF)
-            //         return stream_written;,
-            //     stream_written
-            // );
-
-            if (path->is_branching)
-            {
-                bool bit = process_buffer[process_buffer_index];
-                // bool supposed_value = bitarray_value_at(bit_array, bitarray_prolonged_index + process_buffer_index);
-
-                // if (bit != supposed_value)
-                // printf("Check - read: %d[%d], should-be: %d [%llu]\n", bit, process_buffer_index, supposed_value, bitarray_prolonged_index + process_buffer_index);
-
-                path = huffman_node_traverse(path, bit);
-            }
-
-            if (path == NULL)
-                return stream_written;
-
-            if (path->is_branching)
-                continue;
-
-            if (fputc(path->leaf.val, out_stream) == EOF)
-                return stream_written;
-
-            last_char = path->leaf.val;
-            stream_written++;
-            path = root;
+            decompress_(
+                path,
+                root,
+                process_buffer[process_buffer_index],
+                if (fputc(path->leaf.val, out_stream) == EOF)
+                    return stream_written;,
+                stream_written
+            );
         }
     }
 
