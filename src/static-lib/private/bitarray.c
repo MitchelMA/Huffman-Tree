@@ -557,7 +557,7 @@ bitarray_read_bits_impl__mem_(
     UNUSED(length);
 
     // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
-    const int64_t  container_index     = MAX(BYTE_FILLING_COUNT_(index), 1) - 1;
+    const int64_t  container_index     = BYTE_FILLING_COUNT_(index);
     const uint8_t  starting_bit_offset = BIT_REST_COUNT_(index);
     const uint8_t* mem_buffer          = (uint8_t*) vector_get_start_addr_(bitarray->in_mem.content);
 
@@ -586,7 +586,7 @@ bitarray_read_bits_impl__io_(
 {
     // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
     const int64_t stream_bit_count    = length - bitarray->buffered.bit_offset;
-    const int64_t container_index     = MAX(BYTE_FILLING_COUNT_(index), 1) - 1;
+    const int64_t container_index     = BYTE_FILLING_COUNT_(index);
     const uint8_t starting_bit_offset = BIT_REST_COUNT_(index);
 
     int64_t already_read = 0;
