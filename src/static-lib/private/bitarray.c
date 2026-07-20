@@ -585,9 +585,9 @@ bitarray_read_bits_impl__io_(
 )
 {
     // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
-    const int64_t stream_bit_count    = length - bitarray->buffered.bit_offset;
-    const int64_t container_index     = BYTE_FILLING_COUNT_(index);
-    const uint8_t starting_bit_offset = BIT_REST_COUNT_(index);
+    const bitarray_length_t stream_bit_count = length - bitarray->buffered.bit_offset;
+    const int64_t container_index            = BYTE_FILLING_COUNT_(index);
+    const uint8_t starting_bit_offset        = BIT_REST_COUNT_(index);
 
     int64_t already_read = 0;
 
@@ -596,9 +596,9 @@ bitarray_read_bits_impl__io_(
         // Move the cursor in the stream
         const long initial_pos = stream_towards(bitarray->buffered.file, container_index, SEEK_SET);
 
-        const int64_t stream_remaining_bit_count = stream_bit_count - index;
-        const int64_t stream_remaining_byte_count = REQ_BYTE_COUNT_(stream_remaining_bit_count);
-        const int64_t stream_required_read_byte_count = MIN(REQ_BYTE_COUNT_((int64_t)count), stream_remaining_byte_count);
+        const bitarray_length_t stream_remaining_bit_count = stream_bit_count - index;
+        const int64_t stream_remaining_byte_count          = REQ_BYTE_COUNT_(stream_remaining_bit_count);
+        const int64_t stream_required_read_byte_count      = MIN(REQ_BYTE_COUNT_((int64_t)count), stream_remaining_byte_count);
 
         // Allocate a temp buffer and transfer bytes from stream to the in-mem buffer
         uint8_t* mem_buff = malloc(sizeof(uint8_t) * stream_required_read_byte_count);
@@ -674,7 +674,7 @@ bitarray_length_impl__io_(
     if (stream_size < 0)
         return 0;
 
-    return stream_size * BITS_IN_BYTE_ + bitarray->buffered.bit_offset;
+    return ((bitarray_length_t)stream_size) * BITS_IN_BYTE_ + bitarray->buffered.bit_offset;
 }
 
 void
@@ -755,13 +755,13 @@ bitarray_read_file_impl__io_(
 )
 {
     int read_value = EOF;
-    bitarray_length_t read_amount = 0;
+    int64_t read_amount = 0;
 
     // Calculate the file written bit_offset and the maximum amount of
     // bits that can be read
     const uint8_t bit_offset_count = bitarray_read_sizeheader_(fp);
     const long file_byte_length = stream_tell_remaining_size(fp);
-    const int64_t max_bit_reads = (file_byte_length << BIT_MOST_SIGNIFICANT_)
+    const int64_t max_bit_reads = ((int64_t)file_byte_length << BIT_MOST_SIGNIFICANT_)
         - (bit_offset_count > 0) * (BITS_IN_BYTE_ - bit_offset_count);
 
     bit_count = MIN(bit_count, max_bit_reads);
@@ -799,12 +799,10 @@ bitarray_write_file_impl__io_(
 {
     // Calculate the proper bit_length and required bytes to write from the bit-array stream
     const bitarray_length_t container_bit_count = bitarray_length_impl__io_(bitarray);
+    bit_count = MIN(bit_count, container_bit_count);
 
-    if ((bitarray_length_t) bit_count > container_bit_count)
-        bit_count = (int64_t) container_bit_count;
-
-    const int64_t requested_stream_bit_count    = bit_count - bitarray->buffered.bit_offset;
-    const bitarray_length_t required_byte_count = REQ_BYTE_COUNT_(MAX(requested_stream_bit_count, 0));
+    const bitarray_length_t requested_stream_bit_count = bit_count - bitarray->buffered.bit_offset;
+    const bitarray_length_t required_byte_count        = REQ_BYTE_COUNT_(MAX(requested_stream_bit_count, 0));
 
     // Write the header
     bitarray_write_sizeheader_(bitarray, fp, bit_count);

@@ -706,7 +706,7 @@ compress_symbols_io_(
     #define process_buffer_size (1024 * 10)
     bool process_buffer[process_buffer_size] = {0};
 
-    int64_t read_into_process_buffer = 0;
+    bitarray_length_t read_into_process_buffer = 0;
     int symbol = EOF;
 
     while ((symbol = fgetc(in_stream)) != EOF)
