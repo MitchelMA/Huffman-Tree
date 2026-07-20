@@ -597,21 +597,22 @@ bitarray_read_bits_impl__io_(
         const long initial_pos = stream_towards(bitarray->buffered.file, container_index, SEEK_SET);
 
         const int64_t stream_remaining_bit_count = stream_bit_count - index;
-        const int64_t stream_remining_byte_count = REQ_BYTE_COUNT_(stream_remaining_bit_count);
+        const int64_t stream_remaining_byte_count = REQ_BYTE_COUNT_(stream_remaining_bit_count);
+        const int64_t stream_required_read_byte_count = MIN(REQ_BYTE_COUNT_((int64_t)count), stream_remaining_byte_count);
 
         // Allocate a temp buffer and transfer bytes from stream to the in-mem buffer
-        uint8_t* mem_buff = malloc(sizeof(uint8_t) * stream_remining_byte_count);
+        uint8_t* mem_buff = malloc(sizeof(uint8_t) * stream_required_read_byte_count);
         if (mem_buff == NULL)
             return -1;
 
         const size_t file_read_count = fread(
             mem_buff,
             sizeof(uint8_t),
-            stream_remining_byte_count,
+            stream_required_read_byte_count,
             bitarray->buffered.file
         );
 
-        if (file_read_count < (size_t) stream_remining_byte_count)
+        if (file_read_count < (size_t) stream_required_read_byte_count)
         {
             free(mem_buff);
             return -1;
@@ -621,14 +622,17 @@ bitarray_read_bits_impl__io_(
         stream_towards(bitarray->buffered.file, initial_pos, SEEK_SET);
 
         // Write from the in-mem buffer to the output buffer
-        for (; (bitarray_length_t) already_read < count && already_read < stream_remaining_bit_count; already_read++)
+        for (;
+            (bitarray_length_t) already_read < count &&
+            BYTE_FILLING_COUNT_(already_read) < (int64_t)file_read_count;
+            already_read++)
         {
             const uint8_t local_bit_offset       = (BITS_IN_BYTE_ - 1) - BIT_REST_COUNT_(starting_bit_offset + already_read);
             const int64_t local_container_offset = BYTE_FILLING_COUNT_(already_read);
             const uint8_t container              = mem_buff[local_container_offset];
             const bool    bit_value              = (container >> local_bit_offset) & 1;
 
-            out[already_read] = (bool) bit_value;
+            out[already_read] = bit_value;
         }
 
         // Free the in-mem buffer
