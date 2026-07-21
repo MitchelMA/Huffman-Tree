@@ -187,7 +187,12 @@ int main(void)
     // write compressed into file
     puts("Writing compressed into file...");
     FILE* comp_fp = open_file_write("compressed.huff");
+
+    start_timer(&duration_timer);
     bitarray_write_file(&arr, comp_fp, -1);
+    end_timer(&duration_timer);
+    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+
     rewind(comp_fp);
 
     // Restore into different bitarray
@@ -195,7 +200,12 @@ int main(void)
     bitarray rest_arr = {0};
     bitarray_init_io_buffered(&rest_arr, bitarr_buf);
     // bitarray_init_in_mem(&rest_arr);
+
+    start_timer(&duration_timer);
     bitarray_read_file(&rest_arr, comp_fp, -1);
+    end_timer(&duration_timer);
+    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+
     close_file(comp_fp);
     print_bitarr(&rest_arr);
     puts("");
