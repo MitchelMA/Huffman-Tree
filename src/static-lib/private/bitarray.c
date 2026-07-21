@@ -799,7 +799,7 @@ bitarray_write_file_impl__io_(
 {
     // Calculate the proper bit_length and required bytes to write from the bit-array stream
     const bitarray_length_t container_bit_count = bitarray_length_impl__io_(bitarray);
-    bit_count = MIN(bit_count, container_bit_count);
+    bit_count = MIN((bitarray_length_t)bit_count, container_bit_count);
 
     const bitarray_length_t requested_stream_bit_count = bit_count - bitarray->buffered.bit_offset;
     const bitarray_length_t required_byte_count        = REQ_BYTE_COUNT_(MAX(requested_stream_bit_count, 0));
