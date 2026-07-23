@@ -17,8 +17,8 @@ static bool huffman_node_path_inner_(const huffman_node* root, uint8_t val, bool
 bool
 huffman_node_init_leaf(
     huffman_node* node,
-    uint8_t value,
-    uint64_t count
+    const uint8_t value,
+    const uint64_t count
 )
 {
     node->is_branching = false;
@@ -90,7 +90,7 @@ huffman_node_assign_right(
     if (node->branching.right == NULL)
         return false;
 
-    void* result = memcpy(node->branching.right, right, sizeof(huffman_node));
+    const void* result = memcpy(node->branching.right, right, sizeof(huffman_node));
 
     return result == node->branching.right;
 }
@@ -111,7 +111,7 @@ huffman_node_assign_left(
     if (node->branching.left == NULL)
         return false;
 
-    void* result = memcpy(node->branching.left, left, sizeof(huffman_node));
+    const void* result = memcpy(node->branching.left, left, sizeof(huffman_node));
 
     return result == node->branching.left;
 }
@@ -138,12 +138,12 @@ huffman_node_compare(
 )
 {
     // First compare the count of a against b
-    int count_compare = huffman_node_count(a) - huffman_node_count(b);
+    const int64_t count_compare = (int64_t) huffman_node_count(a) - (int64_t) huffman_node_count(b);
 
     // Then when either one is not a leaf, immediately return
     // when the count-compare is 0
     if (count_compare != 0 || (a->is_branching || b->is_branching))
-        return count_compare;
+        return (int) count_compare;
 
     // Otherwise we also test for alpanumerical value
     return b->leaf.val - a->leaf.val;
@@ -152,7 +152,7 @@ huffman_node_compare(
 bool*
 huffman_node_path(
     const huffman_node* root,
-    uint8_t val,
+    const uint8_t val,
     int64_t* path_length
 )
 {
@@ -167,7 +167,7 @@ huffman_node_path(
 huffman_node*
 huffman_node_traverse(
     const huffman_node* node,
-    bool branch
+    const bool branch
 )
 {
     if (node == NULL || !node->is_branching)
@@ -217,7 +217,7 @@ huffman_node_print_depth(
 void
 huffman_node_print_depth_impl_(
     const huffman_node* node,
-    int depth
+    const int depth
 )
 {
     const char* tabs = "                                   ";
@@ -244,7 +244,7 @@ huffman_node_print_depth_impl_(
 bool
 huffman_node_path_impl_(
     const huffman_node* root,
-    uint8_t val,
+    const uint8_t val,
     bool* path,
     int64_t* len
 )
@@ -281,7 +281,7 @@ huffman_node_path_impl_(
 bool
 huffman_node_path_inner_(
     const huffman_node* root,
-    uint8_t val,
+    const uint8_t val,
     bool* path,
     int64_t* len
 )

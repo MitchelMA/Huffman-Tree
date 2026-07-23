@@ -28,7 +28,7 @@ static size_t doublyll_get_length_(dlinked_list_node* node);
 static dlinked_list_node* doublyll_insert_leaf_oncount_(dlinked_list_node* root, const huffman_node* entry);
 static dlinked_list_node* doublyll_insert_or_update_(dlinked_list_node* root, uint8_t symbol);
 
-static uint8_t* calculate_consecutive_(uint8_t* start, uint8_t* last, huffman_node* output);
+static const uint8_t* calculate_consecutive_(const uint8_t* start, const uint8_t* last, huffman_node* output);
 
 static bool compress_symbol_(const huffman_node* root, uint8_t symbol, bool* out_buffer, size_t buffer_size, bitarray_length_t* out_processed);
 static int64_t compress_symbols_buffer_(const huffman_node* root, const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
@@ -39,7 +39,7 @@ static int64_t compress_symbols_io_(const huffman_node* root, FILE* in_stream, b
 dlinked_list_node*
 huffman_count_text(
     const uint8_t* text,
-    int64_t length
+    const int64_t length
 )
 {
     if (text == NULL || length <= 0)
@@ -62,10 +62,10 @@ huffman_count_text(
     // Manually set the first entry into the linked list
     // to initialize properly
 
-    uintptr_t end = (uintptr_t)(text_copy + length);
-    uint8_t* after = calculate_consecutive_(text_copy, (uint8_t*)end, &list_root->node);
+    const uintptr_t end = (uintptr_t)(text_copy + length);
+    const uint8_t* after = calculate_consecutive_(text_copy, (uint8_t*)end, &list_root->node);
 
-    // Then exaustively insert the rest of the found characters as nodes to the linked listed
+    // Then exhaustively insert the rest of the found characters as nodes to the linked listed
     while (after != NULL)
     {
         huffman_node symbol_node = {0};
@@ -155,7 +155,7 @@ huffman_construct_tree(
         root = doublyll_get_head_(root);
     }
 
-    huffman_node huffman_root = root->node;
+    const huffman_node huffman_root = root->node;
     doublyll_clean(root);
 
     return huffman_root;
@@ -164,7 +164,7 @@ huffman_construct_tree(
 bitarray_length_t
 huffman_compress(
     const huffman_node* root,
-    size_t buffer_size,
+    const size_t buffer_size,
     const uint8_t* buffer,
     bitarray* out_bitarray
 )
@@ -219,17 +219,17 @@ huffman_compress_stream(
     return processed;
 }
 
-#define decompress_(path, root, bit_retreival, writer, written) \
+#define decompress_(path, root, bit_retrieval, writer, written) \
 do { \
     if (path->is_branching) \
     { \
-        bool bit_ = (bit_retreival); \
+        const bool bit_ = (bit_retrieval); \
         (path) = huffman_node_traverse((path), bit_); \
     } \
     if ((path) == NULL) \
         return (written); \
     if ((path)->is_branching) \
-        continue; \
+        break; \
     writer \
     (written)++; \
     (path) = (root); \
@@ -507,7 +507,7 @@ doublyll_get_length_(
     dlinked_list_node* node
 )
 {
-    dlinked_list_node* root = doublyll_get_head_(node);
+    const dlinked_list_node* root = doublyll_get_head_(node);
     size_t count = 1;
 
     while (root != NULL && root->next != NULL)
@@ -562,7 +562,7 @@ doublyll_insert_leaf_oncount_(
 dlinked_list_node*
 doublyll_insert_or_update_(
     dlinked_list_node* root,
-    uint8_t symbol
+    const uint8_t symbol
 )
 {
     dlinked_list_node* target = root;
@@ -613,17 +613,17 @@ doublyll_insert_or_update_(
     return newly;
 }
 
-uint8_t*
+const uint8_t*
 calculate_consecutive_(
-    uint8_t* start,
-    uint8_t* last,
+    const uint8_t* start,
+    const uint8_t* last,
     huffman_node* output
 )
 {
     if (start >= last)
         return NULL;
 
-    uint8_t* current = start;
+    const uint8_t* current = start;
 
     if (!huffman_node_init_leaf(output, *current, 0))
         return NULL;
