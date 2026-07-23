@@ -93,7 +93,8 @@ huffman_count_stream(
     if (text_copy == NULL)
         return NULL;
 
-    fread(text_copy, sizeof(uint8_t), stream_length, stream);
+    if (fread(text_copy, sizeof(uint8_t), stream_length, stream) < (size_t) stream_length)
+        return NULL;
     text_copy[stream_length] = '\0';
 
     qsort(text_copy, stream_length, sizeof(uint8_t), compare_symbol_);
@@ -234,7 +235,7 @@ huffman_compress_stream(
         return 0;
 
     bitarray_length_t processed = 0;
-    bitarray_length_t bits_appended = 0;
+    int64_t bits_appended = 0;
     int64_t advanced = 0;
 
     do
