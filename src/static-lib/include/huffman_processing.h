@@ -22,6 +22,8 @@ typedef struct dlinked_list_node_ {
  */
 dlinked_list_node* huffman_count_text(const uint8_t* text, int64_t length);
 
+dlinked_list_node* huffman_count_stream(FILE* stream);
+
 /**
  * Couts the symbols from the stream, and creates
  * a doubly-linked-list containing unique huffman_node leafs

@@ -1,6 +1,7 @@
 #include "huffman_processing.h"
 
 #include "utility.h"
+#include "io.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -74,6 +75,40 @@ huffman_count_text(
     }
 
     // Wont need the copy after this point
+    free(text_copy);
+
+    list_root = doublyll_get_head_(list_root);
+
+    return list_root;
+}
+
+dlinked_list_node*
+huffman_count_stream(
+    FILE* stream
+)
+{
+    const long stream_length = stream_tell_size(stream);
+    uint8_t* text_copy = malloc(sizeof(uint8_t) * (stream_length + 1));
+    if (text_copy == NULL)
+        return NULL;
+
+    fread(text_copy, sizeof(uint8_t), stream_length, stream);
+    text_copy[stream_length] = '\0';
+
+    qsort(text_copy, stream_length, sizeof(uint8_t), compare_symbol_);
+
+    dlinked_list_node* list_root = doublyll_create_();
+
+    const uintptr_t end = (uintptr_t)(text_copy + stream_length);
+    const uint8_t* after = calculate_consecutive_(text_copy, (uint8_t*)end, &list_root->node);
+
+    while (after != NULL)
+    {
+        huffman_node symbol_node = {0};
+        after = calculate_consecutive_(after, (uint8_t*)end, &symbol_node);
+        doublyll_insert_leaf_oncount_(list_root, &symbol_node);
+    }
+
     free(text_copy);
 
     list_root = doublyll_get_head_(list_root);
