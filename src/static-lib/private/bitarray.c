@@ -58,7 +58,7 @@ static bitarray_bitcontainer_t empty_container_ = 0;
 
 bool
 bitarray_init_in_mem(
-    bitarray* bitarray
+    bitarray* const bitarray
 )
 {
     if (bitarray == NULL)
@@ -72,8 +72,8 @@ bitarray_init_in_mem(
 
 bool
 bitarray_init_io_buffered(
-    bitarray* bitarray,
-    FILE* fp
+    bitarray* const bitarray,
+    FILE* const fp
 )
 {
     if (bitarray == NULL || fp == NULL)
@@ -87,7 +87,7 @@ bitarray_init_io_buffered(
 
 void
 bitarray_clean(
-    bitarray* bitarray
+    bitarray* const bitarray
 )
 {
     if (bitarray == NULL)
@@ -109,7 +109,7 @@ bitarray_clean(
 
 bool
 bitarray_append_bit(
-    bitarray* bitarray,
+    bitarray* const bitarray,
     const bool value
 )
 {
@@ -136,9 +136,9 @@ bitarray_append_bit(
 
 int64_t
 bitarray_append_bits(
-    bitarray* bitarray,
+    bitarray* const bitarray,
     const bitarray_length_t count,
-    const bool* buffer
+    const bool* const buffer
 )
 {
     int64_t ret = -1;
@@ -164,7 +164,7 @@ bitarray_append_bits(
 
 int
 bitarray_value_at(
-    const bitarray* bitarray,
+    const bitarray* const bitarray,
     const bitarray_length_t index
 )
 {
@@ -191,10 +191,10 @@ bitarray_value_at(
 
 int64_t
 bitarray_read_bits(
-    const bitarray* bitarray,
+    const bitarray* const bitarray,
     const bitarray_length_t index,
     const bitarray_length_t count,
-    bool* out
+    bool* const out
 )
 {
     int64_t ret = -1;
@@ -227,7 +227,7 @@ bitarray_read_bits(
 
 bitarray_length_t
 bitarray_length(
-    const bitarray* bitarray
+    const bitarray* const bitarray
 )
 {
     bitarray_length_t ret = 0;
@@ -253,7 +253,7 @@ bitarray_length(
 
 void
 bitarray_flush(
-    bitarray* bitarray
+    bitarray* const bitarray
 )
 {
     if (bitarray == NULL)
@@ -274,8 +274,8 @@ bitarray_flush(
 
 int64_t
 bitarray_read_file(
-    bitarray* bitarray,
-    FILE* fp,
+    bitarray* const bitarray,
+    FILE* const fp,
     int64_t bit_count
 )
 {
@@ -305,8 +305,8 @@ bitarray_read_file(
 
 int64_t
 bitarray_write_file(
-    bitarray* bitarray,
-    FILE* fp,
+    const bitarray* bitarray,
+    FILE* const fp,
     int64_t bit_count
 )
 {
@@ -338,7 +338,7 @@ bitarray_write_file(
 
 void
 bitarray_clean_impl__mem_(
-    bitarray* bitarray
+    bitarray* const bitarray
 )
 {
     if (bitarray->in_mem.content == NULL)
@@ -351,7 +351,7 @@ bitarray_clean_impl__mem_(
 
 void
 bitarray_clean_impl__io_(
-    bitarray* bitarray
+    bitarray* const bitarray
 )
 {
     if (bitarray->buffered.file == NULL)
@@ -365,7 +365,7 @@ bitarray_clean_impl__io_(
 
 bool
 bitarray_append_bit_impl__mem_(
-    bitarray* bitarray,
+    bitarray* const bitarray,
     const bool value
 )
 {
@@ -393,7 +393,7 @@ bitarray_append_bit_impl__mem_(
 
 bool
 bitarray_append_bit_impl__io_(
-    bitarray* bitarray,
+    bitarray* const bitarray,
     const bool value
 )
 {
@@ -412,9 +412,9 @@ bitarray_append_bit_impl__io_(
 
 int64_t
 bitarray_append_bits_impl__mem_(
-    bitarray* bitarray,
+    bitarray* const bitarray,
     const bitarray_length_t count,
-    const bool* buffer
+    const bool* const buffer
 )
 {
     int64_t written = 0;
@@ -455,9 +455,9 @@ bitarray_append_bits_impl__mem_(
 
 int64_t
 bitarray_append_bits_impl__io_(
-    bitarray* bitarray,
+    bitarray* const bitarray,
     const bitarray_length_t count,
-    const bool* buffer
+    const bool* const buffer
 )
 {
     int64_t written = 0;
@@ -475,7 +475,7 @@ bitarray_append_bits_impl__io_(
 
 int
 bitarray_value_at_impl__mem_(
-    const bitarray* bitarray,
+    const bitarray* const bitarray,
     const bitarray_length_t index
 )
 {
@@ -497,7 +497,7 @@ bitarray_value_at_impl__mem_(
 
 int
 bitarray_value_at_impl__io_(
-    const bitarray* bitarray,
+    const bitarray* const bitarray,
     const bitarray_length_t index
 )
 {
@@ -508,7 +508,7 @@ bitarray_value_at_impl__io_(
         return -1;
 
     const bitarray_length_t stream_size = size - bitarray->buffered.bit_offset;
-    const int64_t idx_in_buffer = ((int64_t)index) - stream_size;
+    const int64_t idx_in_buffer = (int64_t) index - (int64_t) stream_size;
 
     // Read from the buffered (not-yet-flushed) value
     if (idx_in_buffer >= 0)
@@ -547,11 +547,11 @@ bitarray_value_at_impl__io_(
 
 int64_t
 bitarray_read_bits_impl__mem_(
-    const bitarray* bitarray,
+    const bitarray* const bitarray,
     const bitarray_length_t length,
     const bitarray_length_t index,
     const bitarray_length_t count,
-    bool* out
+    bool* const out
 )
 {
     UNUSED(length);
@@ -559,7 +559,7 @@ bitarray_read_bits_impl__mem_(
     // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
     const int64_t  container_index     = BYTE_FILLING_COUNT_(index);
     const uint8_t  starting_bit_offset = BIT_REST_COUNT_(index);
-    const uint8_t* mem_buffer          = (uint8_t*) vector_get_start_addr_(bitarray->in_mem.content);
+    const uint8_t* const mem_buffer    = (uint8_t*) vector_get_start_addr_(bitarray->in_mem.content);
 
     // Calculate local byte/bit offsets and write to the output buffer
     for (bitarray_length_t i = 0; i < count; ++i)
@@ -577,11 +577,11 @@ bitarray_read_bits_impl__mem_(
 
 int64_t
 bitarray_read_bits_impl__io_(
-    const bitarray* bitarray,
+    const bitarray* const bitarray,
     const bitarray_length_t length,
     const bitarray_length_t index,
     const bitarray_length_t count,
-    bool* out
+    bool* const out
 )
 {
     // Prepare the proper reading offsets and acquire a pointer to the raw bitarray buffer
@@ -601,7 +601,7 @@ bitarray_read_bits_impl__io_(
         const int64_t stream_required_read_byte_count      = MIN(REQ_BYTE_COUNT_((int64_t)count), stream_remaining_byte_count);
 
         // Allocate a temp buffer and transfer bytes from stream to the in-mem buffer
-        uint8_t* mem_buff = malloc(sizeof(uint8_t) * stream_required_read_byte_count);
+        uint8_t* const mem_buff = malloc(sizeof(uint8_t) * stream_required_read_byte_count);
         if (mem_buff == NULL)
             return -1;
 
@@ -653,7 +653,7 @@ bitarray_read_bits_impl__io_(
 
 bitarray_length_t
 bitarray_length_impl__mem_(
-    const bitarray* bitarray
+    const bitarray* const bitarray
 )
 {
     return BIT_COUNT_(bitarray_bitcontainer_t) *
@@ -666,7 +666,7 @@ bitarray_length_impl__mem_(
 
 bitarray_length_t
 bitarray_length_impl__io_(
-    const bitarray* bitarray
+    const bitarray* const bitarray
 )
 {
     const long stream_size = stream_tell_size(bitarray->buffered.file);
@@ -679,7 +679,7 @@ bitarray_length_impl__io_(
 
 void
 bitarray_flush_impl__io_(
-    bitarray* bitarray
+    bitarray* const bitarray
 )
 {
     if (bitarray->buffered.bit_offset == 0)
@@ -692,8 +692,8 @@ bitarray_flush_impl__io_(
 
 int64_t
 bitarray_read_file_impl__mem_(
-    bitarray* bitarray,
-    FILE* fp,
+    bitarray* const bitarray,
+    FILE* const fp,
     const int64_t bit_count
 )
 {
@@ -730,8 +730,8 @@ bitarray_read_file_impl__mem_(
 
 int64_t
 bitarray_write_file_impl__mem_(
-    const bitarray* bitarray,
-    FILE* fp,
+    const bitarray* const bitarray,
+    FILE* const fp,
     int64_t bit_count
 )
 {
@@ -741,7 +741,7 @@ bitarray_write_file_impl__mem_(
         bit_count = (int64_t)container_bit_count;
 
     const bitarray_length_t byte_count = REQ_BYTE_COUNT_(bit_count);
-    const bitarray_bitcontainer_t* buffer = vector_get_start_addr_(bitarray->in_mem.content);
+    const bitarray_bitcontainer_t* const buffer = vector_get_start_addr_(bitarray->in_mem.content);
 
     bitarray_write_sizeheader_(bitarray, fp, bit_count);
     return (int64_t) fwrite(buffer, sizeof(uint8_t), byte_count, fp);
@@ -749,8 +749,8 @@ bitarray_write_file_impl__mem_(
 
 int64_t
 bitarray_read_file_impl__io_(
-    bitarray* bitarray,
-    FILE* fp,
+    bitarray* const bitarray,
+    FILE* const fp,
     int64_t bit_count
 )
 {
@@ -792,8 +792,8 @@ bitarray_read_file_impl__io_(
 
 int64_t
 bitarray_write_file_impl__io_(
-    const bitarray* bitarray,
-    FILE* fp,
+    const bitarray* const bitarray,
+    FILE* const fp,
     int64_t bit_count
 )
 {
@@ -839,7 +839,7 @@ bitarray_write_file_impl__io_(
 
 uint8_t
 bitarray_restore_bit_offset_(
-    FILE* fp,
+    FILE* const fp,
     const uint8_t preferred,
     const uint8_t abide
 )
@@ -861,8 +861,8 @@ bitarray_restore_bit_offset_(
 
 uint8_t
 bitarray_write_sizeheader_(
-    const bitarray* bitarray,
-    FILE* fp,
+    const bitarray* const bitarray,
+    FILE* const fp,
     int64_t max_bit_count
 )
 {
@@ -874,7 +874,7 @@ bitarray_write_sizeheader_(
     bitarray_length_t bit_count = bitarray_length(bitarray);
     bit_count = MIN(bit_count, (bitarray_length_t)max_bit_count);
 
-    uint8_t bit_offset_count = BIT_REST_COUNT_(bit_count);
+    const uint8_t bit_offset_count = BIT_REST_COUNT_(bit_count);
 
     if (fwrite(&bit_offset_count, sizeof(bit_offset_count), item_write_count, fp) < item_write_count)
         return 0;
@@ -884,7 +884,7 @@ bitarray_write_sizeheader_(
 
 uint8_t
 bitarray_read_sizeheader_(
-    FILE* fp
+    FILE* const fp
 )
 {
     const size_t read_count = 1;
