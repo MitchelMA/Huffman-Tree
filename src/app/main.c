@@ -150,7 +150,7 @@ int main(void)
     puts("Opened text file");
 
     start_timer(&duration_timer);
-    dlinked_list_node* counted_nodes = huffman_count_stream_onepass(text_fp);
+    dlinked_list_node* counted_nodes = huffman_count_stream_table(text_fp);
     end_timer(&duration_timer);
 
     rewind(text_fp);

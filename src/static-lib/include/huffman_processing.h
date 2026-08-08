@@ -31,6 +31,8 @@ dlinked_list_node* huffman_count_stream(FILE* stream);
  */
 dlinked_list_node* huffman_count_stream_onepass(FILE* stream);
 
+dlinked_list_node* huffman_count_stream_table(FILE* stream);
+
 /**
  * Constructs the tree
  * from the sorted doubly-linked-list

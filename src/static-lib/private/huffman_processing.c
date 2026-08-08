@@ -140,6 +140,55 @@ huffman_count_stream_onepass(
     return doublyll_get_head_(list_root);
 }
 
+dlinked_list_node*
+huffman_count_stream_table(
+    FILE* const stream
+)
+{
+    huffman_node table[UINT8_MAX + 1] = {0};
+
+    int symbol = fgetc(stream);
+
+    if (symbol == EOF)
+        return NULL;
+
+    table[symbol].is_branching = false;
+    table[symbol].leaf.val = (uint8_t)symbol;
+    table[symbol].leaf.count++;
+
+    while ((symbol = fgetc(stream)) != EOF)
+    {
+        table[symbol].is_branching = false;
+        table[symbol].leaf.val = (uint8_t)symbol;
+        table[symbol].leaf.count++;
+    }
+
+    qsort(
+        table,
+        UINT8_MAX + 1,
+        sizeof(huffman_node),
+        (int (*) (const void*, const void*))huffman_node_compare);
+
+    dlinked_list_node* current = NULL;
+    dlinked_list_node* head    = NULL;
+
+    for(int i = 0; i < UINT8_MAX + 1; i++)
+    {
+        if (table[i].leaf.count <= 0)
+            continue;
+
+        current = doublyll_create_();
+        current->node = table[i];
+
+        if (head != NULL)
+            doublyll_insert_before_(head, current);
+
+        head = current;
+    }
+
+    return head;
+}
+
 huffman_node
 huffman_construct_tree(
     dlinked_list_node* root
