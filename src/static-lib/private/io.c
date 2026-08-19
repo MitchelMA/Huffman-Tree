@@ -6,7 +6,7 @@ static const char* read_mode   = "rb";
 
 FILE*
 open_file_write(
-    const char* filename
+    const char* const filename
 )
 {
     return fopen(filename, write_mode);
@@ -14,7 +14,7 @@ open_file_write(
 
 FILE*
 open_file_append(
-    const char* filename
+    const char* const filename
 )
 {
     return fopen(filename, append_mode);
@@ -22,7 +22,7 @@ open_file_append(
 
 FILE*
 open_file_read(
-    const char* filename
+    const char* const filename
 )
 {
     return fopen(filename, read_mode);
@@ -30,7 +30,7 @@ open_file_read(
 
 FILE*
 reopen_file_write(
-    FILE* fp
+    FILE* const fp
 )
 {
     return freopen(NULL, write_mode, fp);
@@ -38,7 +38,7 @@ reopen_file_write(
 
 FILE*
 reopen_file_append(
-    FILE* fp
+    FILE* const fp
 )
 {
     return freopen(NULL, append_mode, fp);
@@ -46,7 +46,7 @@ reopen_file_append(
 
 FILE*
 reopen_file_read(
-    FILE* fp
+    FILE* const fp
 )
 {
     return freopen(NULL, read_mode, fp);
@@ -54,7 +54,7 @@ reopen_file_read(
 
 bool
 close_file(
-    FILE* fp
+    FILE* const fp
 )
 {
     return fclose(fp) == 0;
@@ -62,7 +62,7 @@ close_file(
 
 long
 stream_towards(
-    FILE* fp,
+    FILE* const fp,
     const long offset,
     const int whence
 )
@@ -77,7 +77,7 @@ stream_towards(
 
 long
 stream_begin(
-    FILE* fp
+    FILE* const fp
 )
 {
     return stream_towards(fp, 0, SEEK_SET);
@@ -85,7 +85,7 @@ stream_begin(
 
 long
 stream_end(
-    FILE* fp
+    FILE* const fp
 )
 {
     return stream_towards(fp, 0, SEEK_END);
@@ -93,7 +93,7 @@ stream_end(
 
 long
 stream_tell_size(
-    FILE* fp
+    FILE* const fp
 )
 {
     const long initial = stream_end(fp);
@@ -108,7 +108,7 @@ stream_tell_size(
 
 long
 stream_tell_remaining_size(
-    FILE* fp
+    FILE* const fp
 )
 {
     const long start = stream_end(fp);

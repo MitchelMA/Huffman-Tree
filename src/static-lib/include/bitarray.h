@@ -47,7 +47,7 @@ bitarray_length_t bitarray_length(const bitarray* bitarray);
 
 void bitarray_flush(bitarray* bitarray);
 int64_t bitarray_read_file(bitarray* bitarray, FILE* fp, int64_t bit_count);
-int64_t bitarray_write_file(bitarray* bitarray, FILE* fp, int64_t bit_count);
+int64_t bitarray_write_file(const bitarray* bitarray, FILE* fp, int64_t bit_count);
 
 
 #endif // !HUFFMAN_HUFFMAN_BITARRAY_H

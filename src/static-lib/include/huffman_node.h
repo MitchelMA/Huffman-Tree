@@ -46,7 +46,7 @@ uint64_t huffman_node_count(const huffman_node* node);
 int huffman_node_compare(const huffman_node* a, const huffman_node* b);
 
 /**
- * Calculates the path of a given value in the tree from the persepctive of the node:
+ * Calculates the path of a given value in the tree from the perspective of the node:
  * i.e. in reverse.  
  * This has to do with the fact that searching for a value is done depth first
  * with preference to the left.

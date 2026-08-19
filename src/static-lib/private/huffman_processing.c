@@ -1,6 +1,7 @@
 #include "huffman_processing.h"
 
 #include "utility.h"
+#include "io.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -14,6 +15,7 @@ static int compare_symbol_(const void* a, const void* b);
 static dlinked_list_node* doublyll_create_(void);
 
 static dlinked_list_node* doublyll_get_head_(dlinked_list_node* node);
+static const dlinked_list_node* doublyll_get_head_const_(const dlinked_list_node* node);
 static dlinked_list_node* doublyll_get_tail_(dlinked_list_node* node);
 
 static dlinked_list_node* doublyll_insert_before_(dlinked_list_node* target, dlinked_list_node* inserted);
@@ -23,25 +25,29 @@ static dlinked_list_node* doublyll_remove_(dlinked_list_node* removed);
 static dlinked_list_node* doublyll_reinsert_before_(dlinked_list_node* target, dlinked_list_node* inserted);
 static dlinked_list_node* doublyll_reinsert_after_(dlinked_list_node* target, dlinked_list_node* inserted);
 
-static size_t doublyll_get_length_(dlinked_list_node* node);
+static size_t doublyll_get_length_(const dlinked_list_node* node);
 
 static dlinked_list_node* doublyll_insert_leaf_oncount_(dlinked_list_node* root, const huffman_node* entry);
 static dlinked_list_node* doublyll_insert_or_update_(dlinked_list_node* root, uint8_t symbol);
 
-static uint8_t* calculate_consecutive_(uint8_t* start, uint8_t* last, huffman_node* output);
+static const uint8_t* calculate_consecutive_(const uint8_t* start, const uint8_t* last, huffman_node* output);
+
+static bool compress_symbol_(const huffman_node* root, uint8_t symbol, bool* out_buffer, size_t buffer_size, int64_t* out_processed);
+static int64_t compress_symbols_buffer_(const huffman_node* root, const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
+static int64_t compress_symbols_io_(const huffman_node* root, FILE* in_stream, bitarray* out_bitarray, int64_t* out_processed);
 
 // --- END LOCAL DEFINITIONS --- //
 
 dlinked_list_node*
 huffman_count_text(
-    const uint8_t* text,
-    int64_t length
+    const uint8_t* const text,
+    const int64_t length
 )
 {
     if (text == NULL || length <= 0)
         return NULL;
 
-    uint8_t* text_copy = malloc(sizeof(uint8_t) * (length + 1));
+    uint8_t* const text_copy = malloc(sizeof(uint8_t) * (length + 1));
     if (text_copy == NULL)
         return NULL;
 
@@ -58,10 +64,10 @@ huffman_count_text(
     // Manually set the first entry into the linked list
     // to initialize properly
 
-    uintptr_t end = (uintptr_t)(text_copy + length);
-    uint8_t* after = calculate_consecutive_(text_copy, (uint8_t*)end, &list_root->node);
+    const uintptr_t end = (uintptr_t)(text_copy + length);
+    const uint8_t* after = calculate_consecutive_(text_copy, (uint8_t*)end, &list_root->node);
 
-    // Then exaustively insert the rest of the found characters as nodes to the linked listed
+    // Then exhaustively insert the rest of the found characters as nodes to the linked listed
     while (after != NULL)
     {
         huffman_node symbol_node = {0};
@@ -78,8 +84,41 @@ huffman_count_text(
 }
 
 dlinked_list_node*
+huffman_count_stream(
+    FILE* const stream
+)
+{
+    const long stream_length = stream_tell_size(stream);
+    uint8_t* const text_copy = malloc(sizeof(uint8_t) * (stream_length + 1));
+    if (text_copy == NULL)
+        return NULL;
+
+    if (fread(text_copy, sizeof(uint8_t), stream_length, stream) < (size_t) stream_length)
+        return NULL;
+    text_copy[stream_length] = '\0';
+
+    qsort(text_copy, stream_length, sizeof(uint8_t), compare_symbol_);
+
+    dlinked_list_node* const list_root = doublyll_create_();
+
+    const uintptr_t end = (uintptr_t)(text_copy + stream_length);
+    const uint8_t* after = calculate_consecutive_(text_copy, (uint8_t*)end, &list_root->node);
+
+    while (after != NULL)
+    {
+        huffman_node symbol_node = {0};
+        after = calculate_consecutive_(after, (uint8_t*)end, &symbol_node);
+        doublyll_insert_leaf_oncount_(list_root, &symbol_node);
+    }
+
+    free(text_copy);
+
+    return doublyll_get_head_(list_root);
+}
+
+dlinked_list_node*
 huffman_count_stream_onepass(
-    FILE* stream
+    FILE* const stream
 )
 {
     int symbol = fgetc(stream);
@@ -98,8 +137,56 @@ huffman_count_stream_onepass(
         list_root = doublyll_get_head_(list_root);
     }
 
-    doublyll_get_head_(list_root);
-    return list_root;
+    return doublyll_get_head_(list_root);
+}
+
+dlinked_list_node*
+huffman_count_stream_table(
+    FILE* const stream
+)
+{
+    huffman_node table[UINT8_MAX + 1] = {0};
+
+    int symbol = fgetc(stream);
+
+    if (symbol == EOF)
+        return NULL;
+
+    table[symbol].is_branching = false;
+    table[symbol].leaf.val = (uint8_t)symbol;
+    table[symbol].leaf.count++;
+
+    while ((symbol = fgetc(stream)) != EOF)
+    {
+        table[symbol].is_branching = false;
+        table[symbol].leaf.val = (uint8_t)symbol;
+        table[symbol].leaf.count++;
+    }
+
+    qsort(
+        table,
+        UINT8_MAX + 1,
+        sizeof(huffman_node),
+        (int (*) (const void*, const void*))huffman_node_compare);
+
+    dlinked_list_node* current = NULL;
+    dlinked_list_node* head    = NULL;
+
+    for(int i = 0; i < UINT8_MAX + 1; i++)
+    {
+        if (table[i].leaf.count <= 0)
+            continue;
+
+        current = doublyll_create_();
+        current->node = table[i];
+
+        if (head != NULL)
+            doublyll_insert_before_(head, current);
+
+        head = current;
+    }
+
+    return head;
 }
 
 huffman_node
@@ -109,8 +196,8 @@ huffman_construct_tree(
 {
     while (doublyll_get_length_(root) > 1)
     {
-        dlinked_list_node*    ultimate_node = doublyll_get_tail_(root);
-        dlinked_list_node* penultimate_node = ultimate_node->prev;
+        dlinked_list_node* const    ultimate_node = doublyll_get_tail_(root);
+        dlinked_list_node* const penultimate_node = ultimate_node->prev;
 
         penultimate_node->next = NULL;
         ultimate_node->prev = NULL;
@@ -151,7 +238,7 @@ huffman_construct_tree(
         root = doublyll_get_head_(root);
     }
 
-    huffman_node huffman_root = root->node;
+    const huffman_node huffman_root = root->node;
     doublyll_clean(root);
 
     return huffman_root;
@@ -159,25 +246,28 @@ huffman_construct_tree(
 
 bitarray_length_t
 huffman_compress(
-    const huffman_node* root,
-    size_t buffer_size,
-    const uint8_t* buffer,
-    bitarray* out_bitarray
+    const huffman_node* const root,
+    const size_t buffer_size,
+    const uint8_t* const buffer,
+    bitarray* const out_bitarray
 )
 {
     if (root == NULL || buffer == NULL || buffer_size == 0 || out_bitarray == NULL)
         return 0;
 
     bitarray_length_t processed = 0;
-    for (size_t idx = 0; idx < buffer_size; idx++)
+    size_t buffer_idx = 0;
+    while (buffer_idx < buffer_size)
     {
-        int64_t path_len = 0;
-        bool* path = huffman_node_path(root, buffer[idx], &path_len);
-        ARRAY_REVERSE(bool, path, path_len);
-        int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
-        processed += appended;
-        if (appended < path_len)
-            return processed;
+        bitarray_length_t bits_appended = 0;
+        buffer_idx += compress_symbols_buffer_(
+            root,
+            (buffer + buffer_idx),
+            (buffer_size - buffer_idx),
+            out_bitarray,
+            &bits_appended
+        );
+        processed += bits_appended;
     }
 
     return processed;
@@ -185,37 +275,55 @@ huffman_compress(
 
 bitarray_length_t
 huffman_compress_stream(
-    const huffman_node* root,
-    FILE* in_stream,
-    bitarray* out_bitarray
+    const huffman_node* const root,
+    FILE* const in_stream,
+    bitarray* const out_bitarray
 )
 {
     if (root == NULL || in_stream == NULL || out_bitarray == NULL)
         return 0;
 
     bitarray_length_t processed = 0;
-    int symbol = EOF;
+    int64_t bits_appended = 0;
+    int64_t advanced = 0;
 
-    while ((symbol = fgetc(in_stream)) != EOF)
+    do
     {
-        int64_t path_len = 0;
-        bool* path = huffman_node_path(root, (uint8_t)symbol, &path_len);
-        ARRAY_REVERSE(bool, path, path_len);
-        int64_t appended = bitarray_append_bits(out_bitarray, path_len, path);
-        processed += appended;
-        if (appended < path_len)
-            return processed;
-    }
+         advanced = compress_symbols_io_(
+            root,
+            in_stream,
+            out_bitarray,
+            &bits_appended
+        );
+
+        processed += bits_appended;
+    } while (advanced > 0);
 
     return processed;
 }
 
+#define decompress_(path, root, bit_retrieval, writer, written) \
+do { \
+    if (path->is_branching) \
+    { \
+        const bool bit_ = (bit_retrieval); \
+        (path) = huffman_node_traverse((path), bit_); \
+    } \
+    if ((path) == NULL) \
+        return (written); \
+    if ((path)->is_branching) \
+        break; \
+    writer \
+    (written)++; \
+    (path) = (root); \
+} while (0)
+
 size_t
 huffman_decompress(
-    const huffman_node* root,
-    const bitarray* bit_array,
-    size_t buffer_size,
-    uint8_t* buffer
+    const huffman_node* const root,
+    const bitarray* const bit_array,
+    const size_t buffer_size,
+    uint8_t* const buffer
 )
 {
     if (root == NULL || bit_array == NULL || buffer_size == 0 || buffer == NULL)
@@ -225,26 +333,39 @@ huffman_decompress(
     size_t buffer_written = 0;
     const huffman_node* path = root;
 
-    for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
+    #define process_buffer_len (5 * 1024)
+    bool process_buffer[process_buffer_len] = {0};
+    int64_t process_buffer_working_len = 0;
+    bitarray_length_t process_buffer_index = 0;
+    bitarray_length_t bitarray_prolonged_index = 0;
+
+    while (buffer_written < (buffer_size - 1))
     {
-        if (path->is_branching)
+        bitarray_prolonged_index += process_buffer_working_len;
+        process_buffer_working_len = bitarray_read_bits(bit_array,
+            bitarray_prolonged_index,
+            MIN(process_buffer_len, bit_arr_len - bitarray_prolonged_index),
+            process_buffer);
+
+        if (process_buffer_working_len <= 0)
+            break;
+
+        process_buffer_index = 0;
+
+        for (; process_buffer_index < (bitarray_length_t) process_buffer_working_len &&
+            buffer_written < (buffer_size - 1);
+            process_buffer_index++)
         {
-            bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
-            path = huffman_node_traverse(path, bit);
+            decompress_(
+                path,
+                root,
+                process_buffer[process_buffer_index],
+                buffer[buffer_written] = path->leaf.val;,
+                buffer_written);
         }
-
-        if (path == NULL)
-            break;
-
-        if (path->is_branching)
-            continue;
-
-        if (buffer_written >= buffer_size - 1)
-            break;
-
-        buffer[buffer_written++] = path->leaf.val;
-        path = root;
     }
+
+    #undef process_buffer_len
 
     buffer[buffer_written] = '\0';
 
@@ -253,9 +374,9 @@ huffman_decompress(
 
 size_t
 huffman_decompress_stream(
-    const huffman_node* root,
-    const bitarray* bit_array,
-    FILE* out_stream
+    const huffman_node* const root,
+    const bitarray* const bit_array,
+    FILE* const out_stream
 )
 {
     if (root == NULL || bit_array == NULL || out_stream == NULL)
@@ -265,29 +386,45 @@ huffman_decompress_stream(
     size_t stream_written = 0;
     const huffman_node* path = root;
 
-    for (bitarray_length_t bit_idx = 0; bit_idx < bit_arr_len; bit_idx++)
+    #define process_buffer_len (5 * 1024)
+    bool process_buffer[process_buffer_len] = {0};
+    int64_t process_buffer_working_len = 0;
+    bitarray_length_t process_buffer_index = 0;
+    bitarray_length_t bitarray_prolonged_index = 0;
+
+    while (true)
     {
-        if (path->is_branching)
+        bitarray_prolonged_index += process_buffer_working_len;
+        process_buffer_working_len = bitarray_read_bits(bit_array,
+            bitarray_prolonged_index,
+            MIN(process_buffer_len, bit_arr_len - bitarray_prolonged_index),
+            process_buffer);
+
+        if (process_buffer_working_len <= 0)
+            break;
+
+        process_buffer_index = 0;
+
+        for (; process_buffer_index < (bitarray_length_t) process_buffer_working_len;
+            process_buffer_index++)
         {
-            bool bit = (bool)bitarray_value_at(bit_array, bit_idx);
-            path = huffman_node_traverse(path, bit);
+            decompress_(
+                path,
+                root,
+                process_buffer[process_buffer_index],
+                if (fputc(path->leaf.val, out_stream) == EOF)
+                    return stream_written;,
+                stream_written
+            );
         }
-
-        if (path == NULL)
-            break;
-
-        if (path->is_branching)
-            continue;
-
-        if (fputc(path->leaf.val, out_stream) == EOF)
-            break;
-
-        stream_written++;
-        path = root;
     }
+
+    #undef process_buffer_len
 
     return stream_written;
 }
+
+#undef decompress_
 
 void
 doublyll_clean(
@@ -312,8 +449,8 @@ doublyll_clean(
 
 int
 compare_symbol_(
-    const void* a,
-    const void* b
+    const void* const a,
+    const void* const b
 )
 {
     return *(uint8_t*)a - *(uint8_t*)b;
@@ -324,7 +461,7 @@ doublyll_create_(
     void
 )
 {
-    dlinked_list_node* node = malloc(sizeof(dlinked_list_node));
+    dlinked_list_node* const node = malloc(sizeof(dlinked_list_node));
 
     if (node == NULL)
         return NULL;
@@ -337,33 +474,47 @@ doublyll_create_(
 
 dlinked_list_node*
 doublyll_get_head_(
-    dlinked_list_node* node
+    dlinked_list_node* const node
 )
 {
-    while (node != NULL && node->prev != NULL)
-        node = node->prev;
+    dlinked_list_node* current = node;
+    while (current != NULL && current->prev != NULL)
+        current = current->prev;
 
-    return node;
+    return current;
+}
+
+const dlinked_list_node*
+doublyll_get_head_const_(
+    const dlinked_list_node* const node
+)
+{
+    const dlinked_list_node* current = node;
+    while (current != NULL && current->prev != NULL)
+        current = current->prev;
+
+    return current;
 }
 
 dlinked_list_node*
 doublyll_get_tail_(
-    dlinked_list_node* node
+    dlinked_list_node* const node
 )
 {
-    while (node != NULL && node->next != NULL)
-        node = node->next;
+    dlinked_list_node* current = node;
+    while (current != NULL && current->next != NULL)
+        current = current->next;
 
-    return node;
+    return current;
 }
 
 dlinked_list_node*
 doublyll_insert_before_(
-    dlinked_list_node* target,
-    dlinked_list_node* inserted
+    dlinked_list_node* const target,
+    dlinked_list_node* const inserted
 )
 {
-    dlinked_list_node* prev = target->prev;
+    dlinked_list_node* const prev = target->prev;
 
     if (prev != NULL)
         prev->next = inserted;
@@ -377,11 +528,11 @@ doublyll_insert_before_(
 
 dlinked_list_node*
 doublyll_insert_after_(
-    dlinked_list_node* target,
-    dlinked_list_node* inserted
+    dlinked_list_node* const target,
+    dlinked_list_node* const inserted
 )
 {
-    dlinked_list_node* next = target->next;
+    dlinked_list_node* const next = target->next;
 
     if (next != NULL)
         next->prev = inserted;
@@ -395,14 +546,14 @@ doublyll_insert_after_(
 
 dlinked_list_node*
 doublyll_remove_(
-    dlinked_list_node* removed
+    dlinked_list_node* const removed
 )
 {
     if (removed == NULL)
         return NULL;
 
-    dlinked_list_node* old_prev = removed->prev;
-    dlinked_list_node* old_next = removed->next;
+    dlinked_list_node* const old_prev = removed->prev;
+    dlinked_list_node* const old_next = removed->next;
     removed->prev = NULL;
     removed->next = NULL;
 
@@ -416,8 +567,8 @@ doublyll_remove_(
 
 dlinked_list_node*
 doublyll_reinsert_before_(
-    dlinked_list_node* target,
-    dlinked_list_node* inserted
+    dlinked_list_node* const target,
+    dlinked_list_node* const inserted
 )
 {
     if (target == inserted)
@@ -433,8 +584,8 @@ doublyll_reinsert_before_(
 
 dlinked_list_node*
 doublyll_reinsert_after_(
-    dlinked_list_node* target,
-    dlinked_list_node* inserted
+    dlinked_list_node* const target,
+    dlinked_list_node* const inserted
 )
 {
     if (target == inserted)
@@ -450,10 +601,10 @@ doublyll_reinsert_after_(
 
 size_t
 doublyll_get_length_(
-    dlinked_list_node* node
+    const dlinked_list_node* const node
 )
 {
-    dlinked_list_node* root = doublyll_get_head_(node);
+    const dlinked_list_node* root = doublyll_get_head_const_(node);
     size_t count = 1;
 
     while (root != NULL && root->next != NULL)
@@ -468,7 +619,7 @@ doublyll_get_length_(
 dlinked_list_node*
 doublyll_insert_leaf_oncount_(
     dlinked_list_node* root,
-    const huffman_node* entry
+    const huffman_node* const entry
 )
 {
     const uint64_t entry_count = huffman_node_count(entry);
@@ -507,8 +658,8 @@ doublyll_insert_leaf_oncount_(
 
 dlinked_list_node*
 doublyll_insert_or_update_(
-    dlinked_list_node* root,
-    uint8_t symbol
+    dlinked_list_node* const root,
+    const uint8_t symbol
 )
 {
     dlinked_list_node* target = root;
@@ -538,7 +689,7 @@ doublyll_insert_or_update_(
     target->node.leaf.count++;
 
     // Find the place where we should *actually* insert the newly created/updated node
-    dlinked_list_node* newly = target;
+    dlinked_list_node* const newly = target;
     target = target->prev;
 
     // When 'newly' was already the root of the linked-list
@@ -559,17 +710,17 @@ doublyll_insert_or_update_(
     return newly;
 }
 
-uint8_t*
+const uint8_t*
 calculate_consecutive_(
-    uint8_t* start,
-    uint8_t* last,
+    const uint8_t* const start,
+    const uint8_t* const last,
     huffman_node* output
 )
 {
     if (start >= last)
         return NULL;
 
-    uint8_t* current = start;
+    const uint8_t* current = start;
 
     if (!huffman_node_init_leaf(output, *current, 0))
         return NULL;
@@ -581,6 +732,100 @@ calculate_consecutive_(
     }
 
     return current;
+}
+
+
+bool
+compress_symbol_(
+    const huffman_node* const root,
+    const uint8_t symbol,
+    bool* const out_buffer,
+    const size_t buffer_size,
+    int64_t* const out_processed
+)
+{
+    int64_t path_len = 0;
+    const bool* const path = huffman_node_path(root, symbol, &path_len);
+    if ((size_t) path_len > buffer_size)
+        return false;
+
+    while (path_len-- > 0)
+        out_buffer[(*out_processed)++] = path[path_len];
+
+    return true;
+}
+
+int64_t
+compress_symbols_buffer_(
+    const huffman_node* const root,
+    const uint8_t* const buffer,
+    const size_t buffer_size,
+    bitarray* const out_bitarray,
+    bitarray_length_t* const out_processed
+)
+{
+    int64_t symbols_advanced = 0;
+
+    #define process_buffer_size (5 * 1024)
+    bool process_buffer[process_buffer_size] = {0};
+
+    // read into the process buffer
+    int64_t read_into_process_buffer = 0;
+    for (int64_t i = 0; (size_t) i < buffer_size; i++)
+    {
+        int64_t processed = 0;
+        if (!compress_symbol_(root,
+            buffer[i],
+            (process_buffer + read_into_process_buffer),
+            (process_buffer_size - read_into_process_buffer),
+            &processed))
+            break;
+
+        read_into_process_buffer += processed;
+        symbols_advanced++;
+    }
+
+    // insert the booleans into the out bitarray
+    *out_processed = bitarray_append_bits(out_bitarray, read_into_process_buffer, process_buffer);
+    return symbols_advanced;
+    #undef process_buffer_size
+}
+
+int64_t
+compress_symbols_io_(
+    const huffman_node* const root,
+    FILE* const in_stream,
+    bitarray* const out_bitarray,
+    int64_t* const out_processed
+)
+{
+    int64_t symbols_advanced = 0;
+    #define process_buffer_size (5 * 1024)
+    bool process_buffer[process_buffer_size] = {0};
+
+    bitarray_length_t read_into_process_buffer = 0;
+    int symbol = EOF;
+
+    while ((symbol = fgetc(in_stream)) != EOF)
+    {
+        int64_t processed = 0;
+        if (!compress_symbol_(root,
+            (uint8_t)symbol,
+            (process_buffer + read_into_process_buffer),
+            (process_buffer_size - read_into_process_buffer),
+            &processed))
+        {
+            ungetc(symbol, in_stream);
+            break;
+        }
+
+        read_into_process_buffer += processed;
+        symbols_advanced++;
+    }
+
+    *out_processed = bitarray_append_bits(out_bitarray, read_into_process_buffer, process_buffer);
+    return symbols_advanced;
+    #undef process_buffer_size
 }
 
 // --- END LOCAL DEFINITIONS --- //
