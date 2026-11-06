@@ -156,14 +156,15 @@ int main(void)
     rewind(text_fp);
     puts("Parsed for symbol-count:");
     doublyll_print(counted_nodes);
-    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+    printf("Took %'0.lf clocks (%0.3lf seconds)\n", (double)timer_duration(&duration_timer), timer_seconds(&duration_timer));
 
     start_timer(&duration_timer);
     tree_root = huffman_construct_tree(counted_nodes);
     end_timer(&duration_timer);
 
     puts("Constructed tree");
-    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+
+    printf("Took %'0.lf clocks (%0.3lf seconds)\n", (double)timer_duration(&duration_timer), timer_seconds(&duration_timer));
     huffman_node_print_depth(&tree_root);
     puts("");
 
@@ -179,7 +180,7 @@ int main(void)
 
     printf("Compressed file (%llu bits)\n", processed);
     printf("compressed-length: %zu bytes\n", (length >> 3) + 1);
-    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+    printf("Took %'0.lf clocks (%0.3lf seconds)\n", (double)timer_duration(&duration_timer), timer_seconds(&duration_timer));
 
     print_bitarr(&arr);
     puts("");
@@ -191,7 +192,7 @@ int main(void)
     start_timer(&duration_timer);
     bitarray_write_file(&arr, comp_fp, -1);
     end_timer(&duration_timer);
-    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+    printf("Took %'0.lf clocks (%0.3lf seconds)\n", (double)timer_duration(&duration_timer), timer_seconds(&duration_timer));
 
     rewind(comp_fp);
 
@@ -204,7 +205,7 @@ int main(void)
     start_timer(&duration_timer);
     bitarray_read_file(&rest_arr, comp_fp, -1);
     end_timer(&duration_timer);
-    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+    printf("Took %'0.lf clocks (%0.3lf seconds)\n", (double)timer_duration(&duration_timer), timer_seconds(&duration_timer));
 
     close_file(comp_fp);
     print_bitarr(&rest_arr);
@@ -221,7 +222,7 @@ int main(void)
     puts("Decompressed bitarray");
     printf("Written into stream: %zu bytes\n", written);
     printf("Reached compression-ratio of: %0.1f%%\n", (int64_t)(length - (written * 8)) / (float)(written * 8) * 100 );
-    printf("Took %'0.lf clocks\n", (double)timer_duration(&duration_timer));
+    printf("Took %'0.lf clocks (%0.3lf seconds)\n", (double)timer_duration(&duration_timer), timer_seconds(&duration_timer));
 
     huffman_node_clean(&tree_root);
     close_file(text_fp);

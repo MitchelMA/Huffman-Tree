@@ -7,12 +7,20 @@
 #include "huffman_node.h"
 #include "bitarray.h"
 
+#define MAX_FLAT_PATH_LEN 128
+#define FLAT_TREE_SIZE    256
+
 typedef struct dlinked_list_node_ {
     struct dlinked_list_node_* prev;
     struct dlinked_list_node_* next;
 
     huffman_node node;
 } dlinked_list_node;
+
+typedef struct flat_tree_value_ {
+    size_t length;
+    bool   path[MAX_FLAT_PATH_LEN];
+} flat_tree_value;
 
 /**
  * Counts the input text, and creates
@@ -41,6 +49,12 @@ dlinked_list_node* huffman_count_stream_table(FILE* stream);
  * may not be used after calling this function.
  */
 huffman_node huffman_construct_tree(dlinked_list_node* root);
+
+/**
+ * Flattens a constructed huffman_tree.
+ * Expects that the `flat_tree_value` (passed by the caller) always has a length of at least FLAT_TREE_SIZE
+ */
+int huffman_flatten_tree(const huffman_node* root, flat_tree_value flat[static FLAT_TREE_SIZE]);
 
 bitarray_length_t huffman_compress(const huffman_node* root, size_t buffer_size, const uint8_t* buffer, bitarray* out_bitarray);
 bitarray_length_t huffman_compress_stream(const huffman_node* root, FILE* in_stream, bitarray* out_bitarray);

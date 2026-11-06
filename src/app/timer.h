@@ -44,5 +44,16 @@ timer_duration(
     return timer->end_ - timer->start_;
 }
 
+double
+timer_seconds(
+    const struct timer* timer
+)
+{
+    if (timer->start_ > timer->end_)
+        return 0;
+
+    return ((double)(timer->end_ - timer->start_)) / (double) CLOCKS_PER_SEC;
+}
+
 #endif // !TIMER_H
 
