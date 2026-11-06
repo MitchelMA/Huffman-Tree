@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 
 // --- LOCAL DEFINITIONS --- //
@@ -242,6 +243,32 @@ huffman_construct_tree(
     doublyll_clean(root);
 
     return huffman_root;
+}
+
+int
+huffman_flatten_tree(
+    const huffman_node* const root,
+    flat_tree_value* const flat
+)
+{
+    int flattened_count = 0;
+    for (uint8_t symb = 0; symb < UCHAR_MAX; symb++)
+    {
+        int64_t path_length = 0;
+        const bool* path = huffman_node_path(root, symb, &path_length);
+
+        if (path == NULL)
+        {
+            flat[symb].length = 0;
+            continue;
+        }
+
+        flat[symb].length = (size_t)path_length;
+        memcpy(flat[symb].path, path, sizeof(bool) * path_length);
+        flattened_count += (path_length > 0);
+    }
+
+    return flattened_count;
 }
 
 bitarray_length_t
