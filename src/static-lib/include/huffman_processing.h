@@ -51,7 +51,7 @@ huffman_node huffman_construct_tree(dlinked_list_node* root);
 
 /**
  * Flattens a constructed huffman_tree.
- * Expects that the `flat_tree_value` array is always has a length of at least 255
+ * Expects that the `flat_tree_value` array is always has a length of at least 256
  */
 int huffman_flatten_tree(const huffman_node* root, flat_tree_value flat[static 256]);
 

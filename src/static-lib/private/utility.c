@@ -20,9 +20,9 @@ memrev(
 
     while (last > first)
     {
-        memcpy(temp_buffer, (void*) first, 1 * size);
-        memcpy((void*) first, (void*) last, 1 * size);
-        memcpy((void*) last, temp_buffer, 1 * size);
+        memcpy(temp_buffer, (void*) first, size);
+        memcpy((void*) first, (void*) last, size);
+        memcpy((void*) last, temp_buffer, size);
 
         first += size;
         last -= size;
