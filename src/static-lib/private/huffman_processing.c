@@ -266,6 +266,7 @@ huffman_flatten_tree(
 
         flat[symb].length = (size_t)path_length;
         memcpy(flat[symb].path, path, sizeof(bool) * path_length);
+        memrev(flat[symb].path, path_length, sizeof(bool));
         flattened_count += (path_length > 0);
     }
 
@@ -789,9 +790,9 @@ compress_symbol_(
     if ((size_t) path_len > buffer_size)
         return false;
 
-    // Insert the path in reverse (as the path is stored in reverse)
-    while (path_len-- > 0)
-        out_buffer[(*out_processed)++] = path[path_len];
+    // Insert the path into the output buffer
+    for (int64_t i = 0; i < path_len; i++)
+        out_buffer[(*out_processed)++] = path[i];
 
     return true;
 }
