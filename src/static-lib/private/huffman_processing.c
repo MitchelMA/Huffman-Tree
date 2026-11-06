@@ -34,9 +34,9 @@ static dlinked_list_node* doublyll_insert_or_update_(dlinked_list_node* root, ui
 
 static const uint8_t* calculate_consecutive_(const uint8_t* start, const uint8_t* last, huffman_node* output);
 
-static bool compress_symbol_(const flat_tree_value flat_tree[static 256], uint8_t symbol, bool* out_buffer, size_t buffer_size, int64_t* out_processed);
-static int64_t compress_symbols_buffer_(const flat_tree_value flat_tree[static 256], const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
-static int64_t compress_symbols_io_(const flat_tree_value flat_tree[static 256], FILE* in_stream, bitarray* out_bitarray, int64_t* out_processed);
+static bool compress_symbol_(const flat_tree_value flat_tree[static FLAT_TREE_SIZE], uint8_t symbol, bool* out_buffer, size_t buffer_size, int64_t* out_processed);
+static int64_t compress_symbols_buffer_(const flat_tree_value flat_tree[static FLAT_TREE_SIZE], const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
+static int64_t compress_symbols_io_(const flat_tree_value flat_tree[static FLAT_TREE_SIZE], FILE* in_stream, bitarray* out_bitarray, int64_t* out_processed);
 
 // --- END LOCAL DEFINITIONS --- //
 
@@ -253,7 +253,7 @@ huffman_flatten_tree(
 )
 {
     int flattened_count = 0;
-    for (int symb = 0; symb < UCHAR_MAX + 1; symb++)
+    for (int symb = 0; symb < FLAT_TREE_SIZE; symb++)
     {
         int64_t path_length = 0;
         const bool* path = huffman_node_path(root, (uint8_t)symb, &path_length);
@@ -284,7 +284,7 @@ huffman_compress(
     if (root == NULL || buffer == NULL || buffer_size == 0 || out_bitarray == NULL)
         return 0;
 
-    flat_tree_value flattened[256] = {0};
+    flat_tree_value flattened[FLAT_TREE_SIZE] = {0};
     huffman_flatten_tree(root, flattened);
 
     bitarray_length_t processed = 0;
@@ -315,7 +315,7 @@ huffman_compress_stream(
     if (root == NULL || in_stream == NULL || out_bitarray == NULL)
         return 0;
 
-    flat_tree_value flattened[256] = {0};
+    flat_tree_value flattened[FLAT_TREE_SIZE] = {0};
     huffman_flatten_tree(root, flattened);
 
     bitarray_length_t processed = 0;
