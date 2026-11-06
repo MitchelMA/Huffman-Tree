@@ -53,7 +53,7 @@ huffman_node huffman_construct_tree(dlinked_list_node* root);
  * Flattens a constructed huffman_tree.
  * Expects that the `flat_tree_value` array is always has a length of at least 255
  */
-int huffman_flatten_tree(const huffman_node* root, flat_tree_value flat[static 255]);
+int huffman_flatten_tree(const huffman_node* root, flat_tree_value flat[static 256]);
 
 bitarray_length_t huffman_compress(const huffman_node* root, size_t buffer_size, const uint8_t* buffer, bitarray* out_bitarray);
 bitarray_length_t huffman_compress_stream(const huffman_node* root, FILE* in_stream, bitarray* out_bitarray);

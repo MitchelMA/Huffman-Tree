@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <assert.h>
 
 
 // --- LOCAL DEFINITIONS --- //
@@ -33,9 +34,9 @@ static dlinked_list_node* doublyll_insert_or_update_(dlinked_list_node* root, ui
 
 static const uint8_t* calculate_consecutive_(const uint8_t* start, const uint8_t* last, huffman_node* output);
 
-static bool compress_symbol_(const huffman_node* root, uint8_t symbol, bool* out_buffer, size_t buffer_size, int64_t* out_processed);
-static int64_t compress_symbols_buffer_(const huffman_node* root, const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
-static int64_t compress_symbols_io_(const huffman_node* root, FILE* in_stream, bitarray* out_bitarray, int64_t* out_processed);
+static bool compress_symbol_(const flat_tree_value flat_tree[static 256], uint8_t symbol, bool* out_buffer, size_t buffer_size, int64_t* out_processed);
+static int64_t compress_symbols_buffer_(const flat_tree_value flat_tree[static 256], const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
+static int64_t compress_symbols_io_(const flat_tree_value flat_tree[static 256], FILE* in_stream, bitarray* out_bitarray, int64_t* out_processed);
 
 // --- END LOCAL DEFINITIONS --- //
 
@@ -252,10 +253,10 @@ huffman_flatten_tree(
 )
 {
     int flattened_count = 0;
-    for (uint8_t symb = 0; symb < UCHAR_MAX; symb++)
+    for (int symb = 0; symb < UCHAR_MAX + 1; symb++)
     {
         int64_t path_length = 0;
-        const bool* path = huffman_node_path(root, symb, &path_length);
+        const bool* path = huffman_node_path(root, (uint8_t)symb, &path_length);
 
         if (path == NULL)
         {
@@ -282,13 +283,16 @@ huffman_compress(
     if (root == NULL || buffer == NULL || buffer_size == 0 || out_bitarray == NULL)
         return 0;
 
+    flat_tree_value flattened[256] = {0};
+    huffman_flatten_tree(root, flattened);
+
     bitarray_length_t processed = 0;
     size_t buffer_idx = 0;
     while (buffer_idx < buffer_size)
     {
         bitarray_length_t bits_appended = 0;
         buffer_idx += compress_symbols_buffer_(
-            root,
+            flattened,
             (buffer + buffer_idx),
             (buffer_size - buffer_idx),
             out_bitarray,
@@ -310,6 +314,9 @@ huffman_compress_stream(
     if (root == NULL || in_stream == NULL || out_bitarray == NULL)
         return 0;
 
+    flat_tree_value flattened[256] = {0};
+    huffman_flatten_tree(root, flattened);
+
     bitarray_length_t processed = 0;
     int64_t bits_appended = 0;
     int64_t advanced = 0;
@@ -317,7 +324,7 @@ huffman_compress_stream(
     do
     {
          advanced = compress_symbols_io_(
-            root,
+            flattened,
             in_stream,
             out_bitarray,
             &bits_appended
@@ -764,18 +771,25 @@ calculate_consecutive_(
 
 bool
 compress_symbol_(
-    const huffman_node* const root,
+    const flat_tree_value* const flat_tree,
     const uint8_t symbol,
     bool* const out_buffer,
     const size_t buffer_size,
     int64_t* const out_processed
 )
 {
-    int64_t path_len = 0;
-    const bool* const path = huffman_node_path(root, symbol, &path_len);
+    // Obtain path-item from symbol
+    flat_tree_value item = flat_tree[symbol];
+    int64_t path_len = item.length;
+    const bool* path = item.path;
+
+    // Assert that the path_len is always greater than 0
+    assert(path_len > 0);
+
     if ((size_t) path_len > buffer_size)
         return false;
 
+    // Insert the path in reverse (as the path is stored in reverse)
     while (path_len-- > 0)
         out_buffer[(*out_processed)++] = path[path_len];
 
@@ -784,7 +798,7 @@ compress_symbol_(
 
 int64_t
 compress_symbols_buffer_(
-    const huffman_node* const root,
+    const flat_tree_value* const flat_tree,
     const uint8_t* const buffer,
     const size_t buffer_size,
     bitarray* const out_bitarray,
@@ -801,7 +815,7 @@ compress_symbols_buffer_(
     for (int64_t i = 0; (size_t) i < buffer_size; i++)
     {
         int64_t processed = 0;
-        if (!compress_symbol_(root,
+        if (!compress_symbol_(flat_tree,
             buffer[i],
             (process_buffer + read_into_process_buffer),
             (process_buffer_size - read_into_process_buffer),
@@ -820,7 +834,7 @@ compress_symbols_buffer_(
 
 int64_t
 compress_symbols_io_(
-    const huffman_node* const root,
+    const flat_tree_value* const flat_tree,
     FILE* const in_stream,
     bitarray* const out_bitarray,
     int64_t* const out_processed
@@ -836,7 +850,7 @@ compress_symbols_io_(
     while ((symbol = fgetc(in_stream)) != EOF)
     {
         int64_t processed = 0;
-        if (!compress_symbol_(root,
+        if (!compress_symbol_(flat_tree,
             (uint8_t)symbol,
             (process_buffer + read_into_process_buffer),
             (process_buffer_size - read_into_process_buffer),
