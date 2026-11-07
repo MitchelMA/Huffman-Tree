@@ -9,6 +9,7 @@
 #include "huffman_processing.h"
 #include "bitarray.h"
 #include "io.h"
+#include "header.h"
 
 #include "timer.h"
 
@@ -112,6 +113,17 @@ void print_bitarr_old(const bitarray* bitarray)
     printf(" (%d)", length);
 }
 
+int main(void)
+{
+    FILE* file = open_file_read("header.txt");
+    huffman_header header = parse_header_stream(file);
+    char header_buffer[256] = {0};
+    header_get_value(&header, "key", 256, header_buffer);
+    printf("key: %s\n", header_buffer);
+    header_clean(&header);
+    fclose(file);
+}
+
 int main5(void)
 {
     const bool boolarr[] = { 0, 1, 1, 0, 1, 1 };
@@ -133,7 +145,7 @@ int main5(void)
     return EXIT_SUCCESS;
 }
 
-int main(void)
+int main6(void)
 {
     setlocale(LC_ALL, "");
     struct timer duration_timer = {};
