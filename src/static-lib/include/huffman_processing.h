@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "utility.h"
 #include "huffman_node.h"
 #include "bitarray.h"
 
@@ -54,7 +55,7 @@ huffman_node huffman_construct_tree(dlinked_list_node* root);
  * Flattens a constructed huffman_tree.
  * Expects that the `flat_tree_value` (passed by the caller) always has a length of at least FLAT_TREE_SIZE
  */
-int huffman_flatten_tree(const huffman_node* root, flat_tree_value flat[static FLAT_TREE_SIZE]);
+int huffman_flatten_tree(const huffman_node* root, flat_tree_value STATIC_SIZE_ARRAY flat STATIC_SIZE_ARRAY_SIZE(FLAT_TREE_SIZE));
 
 bitarray_length_t huffman_compress(const huffman_node* root, size_t buffer_size, const uint8_t* buffer, bitarray* out_bitarray);
 bitarray_length_t huffman_compress_stream(const huffman_node* root, FILE* in_stream, bitarray* out_bitarray);

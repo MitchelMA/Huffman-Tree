@@ -34,9 +34,9 @@ static dlinked_list_node* doublyll_insert_or_update_(dlinked_list_node* root, ui
 
 static const uint8_t* calculate_consecutive_(const uint8_t* start, const uint8_t* last, huffman_node* output);
 
-static bool compress_symbol_(const flat_tree_value flat_tree[static FLAT_TREE_SIZE], uint8_t symbol, bool* out_buffer, size_t buffer_size, int64_t* out_processed);
-static int64_t compress_symbols_buffer_(const flat_tree_value flat_tree[static FLAT_TREE_SIZE], const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
-static int64_t compress_symbols_io_(const flat_tree_value flat_tree[static FLAT_TREE_SIZE], FILE* in_stream, bitarray* out_bitarray, int64_t* out_processed);
+static bool compress_symbol_(const flat_tree_value STATIC_SIZE_ARRAY flat_tree STATIC_SIZE_ARRAY_SIZE(FLAT_TREE_SIZE), uint8_t symbol, bool* out_buffer, size_t buffer_size, int64_t* out_processed);
+static int64_t compress_symbols_buffer_(const flat_tree_value STATIC_SIZE_ARRAY flat_tree STATIC_SIZE_ARRAY_SIZE(FLAT_TREE_SIZE), const uint8_t* buffer, size_t buffer_size, bitarray* out_bitarray, bitarray_length_t* out_processed);
+static int64_t compress_symbols_io_(const flat_tree_value STATIC_SIZE_ARRAY flat_tree STATIC_SIZE_ARRAY_SIZE(FLAT_TREE_SIZE), FILE* in_stream, bitarray* out_bitarray, int64_t* out_processed);
 
 // --- END LOCAL DEFINITIONS --- //
 
@@ -780,8 +780,8 @@ compress_symbol_(
 )
 {
     // Obtain path-item from symbol
-    flat_tree_value item = flat_tree[symbol];
-    int64_t path_len = item.length;
+    const flat_tree_value item = flat_tree[symbol];
+    const int64_t path_len = (int64_t) item.length;
     const bool* path = item.path;
 
     // Assert that the path_len is always greater than 0

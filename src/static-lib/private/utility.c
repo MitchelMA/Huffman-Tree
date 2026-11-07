@@ -1,8 +1,9 @@
 #include "utility.h"
 
 #include <stdint.h>
-#include <alloca.h>
 #include <string.h>
+
+static char* temp_buffer[2048] = {0};
 
 void*
 memrev(
@@ -13,7 +14,6 @@ memrev(
 {
     uintptr_t first = (uintptr_t) src;
     uintptr_t last  = ((uintptr_t) src + ((n - 1) * size));
-    void* const temp_buffer = alloca(size);
 
     if (last - first < size)
         return src;
