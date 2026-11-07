@@ -3,7 +3,6 @@
 #include "utility.h"
 
 #include <stdlib.h>
-#include <alloca.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -24,7 +23,7 @@ parse_header_stream(
 {
     const size_t newline_size         = strlen(NEWLINE);
     const size_t sliding_window_size  = strlen(HEADER_END_INDICATOR);
-    char* const sliding_window_buffer = alloca(sliding_window_size + 1);
+    char* const sliding_window_buffer = malloc(sliding_window_size + 1);
     long header_end_pos               = 0;
     long header_line_count            = 0;
 
@@ -41,11 +40,13 @@ parse_header_stream(
         
         if (strncmp(HEADER_END_INDICATOR, sliding_window_buffer, sliding_window_size) == 0)
         {
-            header_end_pos = ftell(stream) - sliding_window_size - newline_size;
+            header_end_pos = (long) (ftell(stream) - sliding_window_size - newline_size);
             rewind(stream);
             break;
         }
     }
+
+    free(sliding_window_buffer);
 
     char* const raw_text_buffer = (char*) malloc(sizeof(char) * header_end_pos + 1);
     raw_text_buffer[header_end_pos] = '\0';
@@ -75,9 +76,9 @@ parse_header_stream(
     {
         long line_length = 0;
         if (i < header_line_count - 1)
-            line_length = header_line_offsets[i+1] - header_line_offsets[i] - newline_size;
+            line_length = (long) (header_line_offsets[i+1] - header_line_offsets[i] - newline_size);
         else
-            line_length = strlen(raw_text_buffer + header_line_offsets[i]);
+            line_length = (long) strlen(raw_text_buffer + header_line_offsets[i]);
 
         const char* const local_line_string = raw_text_buffer + header_line_offsets[i];
         void* split_addr                    = memchr(local_line_string, (int)':', line_length);
@@ -143,9 +144,11 @@ header_get_value(
     for (size_t i = 0; i < header->header_entry_count_; i++)
     {
         const huffman_header_keypair* entry = &header->header_entries_[i];
-        const size_t shortest_key_length = MIN(entry->key_string_length_, strlen(in_key));
+
+        if (entry->key_string_length_ != strlen(in_key))
+            continue;
         
-        if (strncmp(entry->key_string_start_, in_key, shortest_key_length) != 0)
+        if (strncmp(entry->key_string_start_, in_key, entry->key_string_length_) != 0)
             continue;
 
         const size_t shortest_value_length = MIN(entry->value_string_length_, out_length - 1);
@@ -155,6 +158,31 @@ header_get_value(
     }
 
     return 0;
+}
+
+bool
+header_contains(
+    const huffman_header* const header,
+    const char* const in_key
+)
+{
+    if (header == NULL || in_key == NULL || header->header_entries_ == NULL)
+        return false;
+
+    for (size_t i = 0; i < header->header_entry_count_; i++)
+    {
+        const huffman_header_keypair* entry = &header->header_entries_[i];
+
+        if (entry->key_string_length_ != strlen(in_key))
+            continue;
+
+        if (strncmp(entry->key_string_start_, in_key, entry->key_string_length_) != 0)
+            continue;
+
+        return true;
+    }
+
+    return false;
 }
 
 
