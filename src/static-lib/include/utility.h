@@ -28,6 +28,20 @@ do { \
         SWAP_INNER_(temp_, ARR_[i_], ARR_[LEN_ - 1 - i_]); \
 } while (0)
 
+#define STATIC_SIZE_ARRAY
+
+#if defined(WIN32)
+#undef STATIC_SIZE_ARRAY
+#define STATIC_SIZE_ARRAY *
+#endif
+
+#define STATIC_SIZE_ARRAY_SIZE(SIZE_)
+
+#if defined(__linux__)
+#undef STATIC_SIZE_ARRAY_SIZE
+#define STATIC_SIZE_ARRAY_SIZE(SIZE_) [static SIZE_]
+#endif
+
 void* memrev(void* src, size_t n, size_t size);
 
 #endif // !HUFFMAN_HUFFMAN_UTILITY_H
