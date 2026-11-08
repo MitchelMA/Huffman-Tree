@@ -119,12 +119,17 @@ int main(void)
     huffman_header header = parse_header_stream(file);
     char header_buffer[256] = {0};
     header_get_value(&header, "key", 256, header_buffer);
-    printf("key: %s (%d)\n", header_buffer, header_contains(&header, "key"));
+    printf("key:     %s (%d)\n", header_buffer, header_contains(&header, "key"));
     header_get_value(&header, "sleutel", 256, header_buffer);
-    printf("key: %s (%d)\n", header_buffer, header_contains(&header, "sleutel"));
+    printf("sleutel: %s (%d)\n", header_buffer, header_contains(&header, "sleutel"));
     header_get_value(&header, "ja", 256, header_buffer);
-    printf("key: %s (%d)\n", header_buffer, header_contains(&header, "ja"));
+    printf("ja:      %s (%d)\n", header_buffer, header_contains(&header, "ja"));
     header_clean(&header);
+
+    char buffer[128] = {0};
+    if (fread(buffer, sizeof(char), 127, file) > 0)
+        printf("after-header: '%s'\n", buffer);
+
     fclose(file);
 }
 

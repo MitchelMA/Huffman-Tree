@@ -15,6 +15,7 @@
 #endif 
 
 static char* buffer_shift_append_(size_t buffer_size, char* buffer, char symbol);
+static void  keypair_clean_(void* pair);
 
 huffman_header
 parse_header_stream(
@@ -48,6 +49,7 @@ parse_header_stream(
 
     free(sliding_window_buffer);
 
+    // Read the entire header into memory
     char* const raw_text_buffer = (char*) malloc(sizeof(char) * header_end_pos + 1);
     raw_text_buffer[header_end_pos] = '\0';
     
@@ -56,6 +58,9 @@ parse_header_stream(
         free(raw_text_buffer);
         return (huffman_header) {0};
     }
+
+    // Set the cursor to the line directly after the header-end
+    fseek(stream, header_end_pos + 2 * newline_size + sliding_window_size, SEEK_SET);
 
     // Split the header into seperate lines denoted by local offsets
     const char* raw_text_buffer_pos = raw_text_buffer;
@@ -71,7 +76,7 @@ parse_header_stream(
     }
 
     // Split the lines into key-value pairs
-    huffman_header_keypair* keyvalue_pairs = malloc(sizeof(huffman_header_keypair) * header_line_count);
+    vector_t* keyvalue_pairs = vector_create(sizeof(huffman_header_keypair));
     for (long i = 0; i < header_line_count; i++)
     {
         long line_length = 0;
@@ -87,23 +92,28 @@ parse_header_stream(
         const char* const value_start = ((char*) split_addr) + 1;
         const size_t value_length     = line_length - key_length - 1;
 
+        char* key_string   = malloc(key_length + 1);
+        char* value_string = malloc(value_length + 1);
+
+        key_string[key_length]     = '\0';
+        value_string[value_length] = '\0';
+
+        strncpy(key_string, local_line_string, key_length);
+        strncpy(value_string, value_start, value_length);
+
         const huffman_header_keypair keypair = {
-            .key_string_length_   = key_length,
-            .value_string_length_ = value_length,
-            .key_string_start_    = local_line_string,
-            .value_string_start_  = value_start
+            .key_string_ = key_string,
+            .value_string_ = value_string
         };
 
-        memcpy(&keyvalue_pairs[i], &keypair, sizeof(huffman_header_keypair));
+        vector_append(keyvalue_pairs, (void*) &keypair);
     }
 
+    free(raw_text_buffer);
     free(header_line_offsets);
 
     return (huffman_header) {
-        .header_raw_text_length_ = header_end_pos,
-        .header_entry_count_     = header_line_count,
-        .header_raw_text_        = raw_text_buffer,
-        .header_entries_         = keyvalue_pairs
+        .header_entries_ = keyvalue_pairs
     };
 }
 
@@ -112,20 +122,11 @@ header_clean(
     huffman_header* const header
 )
 {
-    if (header == NULL)
+    if (header == NULL && header->header_entries_ != NULL)
         return;
 
-    if (header->header_raw_text_ != NULL)
-    {
-        free(header->header_raw_text_);
-        header->header_raw_text_ = NULL;
-    }
-
-    if (header->header_entries_ != NULL)
-    {
-        free(header->header_entries_);
-        header->header_entries_ = NULL;
-    }
+    vector_clean_deep(header->header_entries_, keypair_clean_);
+    header->header_entries_ = NULL;
 }
 
 
@@ -141,18 +142,25 @@ header_get_value(
         header->header_entries_ == NULL)
         return 0;
 
-    for (size_t i = 0; i < header->header_entry_count_; i++)
-    {
-        const huffman_header_keypair* entry = &header->header_entries_[i];
+    const size_t entry_count = vector_get_elem_count(header->header_entries_);
 
-        if (entry->key_string_length_ != strlen(in_key))
+    for (size_t i = 0; i < entry_count; i++)
+    {
+        huffman_header_keypair* entry = NULL;
+        if (!vector_elem_at(header->header_entries_, i, (void**)&entry))
+            continue;
+
+        const size_t key_string_length = strlen(entry->key_string_);
+
+        if (key_string_length != strlen(in_key))
             continue;
         
-        if (strncmp(entry->key_string_start_, in_key, entry->key_string_length_) != 0)
+        if (strncmp(entry->key_string_, in_key, key_string_length) != 0)
             continue;
 
-        const size_t shortest_value_length = MIN(entry->value_string_length_, out_length - 1);
-        strncpy(out_value, entry->value_string_start_, shortest_value_length);
+        const size_t shortest_value_length = MIN(strlen(entry->value_string_), out_length - 1);
+
+        strncpy(out_value, entry->value_string_, shortest_value_length);
         out_value[shortest_value_length] = '\0';
         return shortest_value_length;
     }
@@ -169,14 +177,20 @@ header_contains(
     if (header == NULL || in_key == NULL || header->header_entries_ == NULL)
         return false;
 
-    for (size_t i = 0; i < header->header_entry_count_; i++)
-    {
-        const huffman_header_keypair* entry = &header->header_entries_[i];
+    const size_t entry_count = vector_get_elem_count(header->header_entries_);
 
-        if (entry->key_string_length_ != strlen(in_key))
+    for (size_t i = 0; i < entry_count; i++)
+    {
+        huffman_header_keypair* entry = NULL;
+        if (!vector_elem_at(header->header_entries_, i, (void**)&entry))
             continue;
 
-        if (strncmp(entry->key_string_start_, in_key, entry->key_string_length_) != 0)
+        const size_t key_string_length = strlen(entry->key_string_);
+
+        if (key_string_length  != strlen(in_key))
+            continue;
+
+        if (strncmp(entry->key_string_, in_key, key_string_length ) != 0)
             continue;
 
         return true;
@@ -198,4 +212,18 @@ buffer_shift_append_(
 
     buffer[buffer_size - 1] = symbol;
     return buffer;
+}
+
+void
+keypair_clean_(
+    void* const pair
+)
+{
+    huffman_header_keypair* keyvalue = (huffman_header_keypair*) pair;
+
+    if (keyvalue->key_string_ != NULL)
+        free(keyvalue->key_string_);
+
+    if (keyvalue->value_string_ != NULL)
+        free(keyvalue->value_string_);
 }
