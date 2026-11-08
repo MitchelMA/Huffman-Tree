@@ -8,6 +8,7 @@
 
 #define HEADER_END_INDICATOR "---"
 
+#define NEWLINE_PREDICATOR "-"
 #if defined(WIN32)
 #define NEWLINE "\r\n"
 #else
@@ -24,6 +25,7 @@ parse_header_stream(
     FILE* stream
 )
 {
+    const size_t newline_pred_size    = strlen(NEWLINE_PREDICATOR);
     const size_t newline_size         = strlen(NEWLINE);
     const size_t sliding_window_size  = strlen(HEADER_END_INDICATOR);
     char* const sliding_window_buffer = malloc(sliding_window_size + 1);
@@ -38,12 +40,12 @@ parse_header_stream(
     {
         buffer_shift_append_(sliding_window_size, sliding_window_buffer, (char)sym);
         
-        if (strstr(sliding_window_buffer, "\n") == sliding_window_buffer)
+        if (strstr(sliding_window_buffer, NEWLINE_PREDICATOR NEWLINE) == sliding_window_buffer)
             header_line_count++;
         
         if (strncmp(HEADER_END_INDICATOR, sliding_window_buffer, sliding_window_size) == 0)
         {
-            header_end_pos = (long) (ftell(stream) - sliding_window_size - newline_size);
+            header_end_pos = (long) (ftell(stream) - sliding_window_size - (newline_size - newline_pred_size));
             rewind(stream);
             break;
         }
@@ -62,7 +64,7 @@ parse_header_stream(
     }
 
     // Set the cursor to the line directly after the header-end
-    fseek(stream, header_end_pos + 2 * newline_size + sliding_window_size, SEEK_SET);
+    fseek(stream, header_end_pos + 2 * newline_size + sliding_window_size - newline_pred_size, SEEK_SET);
 
     // Split the header into seperate lines denoted by local offsets
     const char* raw_text_buffer_pos = raw_text_buffer;
@@ -71,10 +73,10 @@ parse_header_stream(
 
     for (long i = 1; i < header_line_count; i++)
     {
-        void* line_end_addr    = memchr(raw_text_buffer_pos, (int)'\n', HEADER_MAX_LINE_LENGTH);
+        void* line_end_addr    = strstr(raw_text_buffer_pos, NEWLINE_PREDICATOR NEWLINE);
         int local_offset       = (int)  ((uintptr_t) line_end_addr - (uintptr_t) raw_text_buffer);
-        raw_text_buffer_pos    = (void*) ((uintptr_t) line_end_addr + 1);
-        header_line_offsets[i] = local_offset + 1;
+        raw_text_buffer_pos    = (void*) ((uintptr_t) line_end_addr + newline_size + newline_pred_size);
+        header_line_offsets[i] = local_offset + newline_size + newline_pred_size;
     }
 
     // Split the lines into key-value pairs
@@ -83,9 +85,9 @@ parse_header_stream(
     {
         long line_length = 0;
         if (i < header_line_count - 1)
-            line_length = (long) (header_line_offsets[i+1] - header_line_offsets[i] - newline_size);
+            line_length = (long) (header_line_offsets[i+1] - header_line_offsets[i] - (newline_size + newline_pred_size));
         else
-            line_length = (long) strlen(raw_text_buffer + header_line_offsets[i]);
+            line_length = (long) strlen(raw_text_buffer + header_line_offsets[i]) - (newline_size + newline_pred_size);
 
         const char* const local_line_string = raw_text_buffer + header_line_offsets[i];
         void* const split_addr              = memchr(local_line_string, (int)':', line_length);
@@ -229,10 +231,11 @@ header_flush_stream(
         const size_t entry_key_size   = strlen(entry_key);
         const size_t entry_value_size = strlen(entry_value);
 
-        fwrite(entry_key,   sizeof(char), entry_key_size,   stream);
-        fwrite(":",         sizeof(char), 1,                stream);
-        fwrite(entry_value, sizeof(char), entry_value_size, stream);
-        fwrite(NEWLINE,     sizeof(char), strlen(NEWLINE),  stream);
+        fwrite(entry_key,          sizeof(char), entry_key_size,             stream);
+        fwrite(":",                sizeof(char), 1,                          stream);
+        fwrite(entry_value,        sizeof(char), entry_value_size,           stream);
+        fwrite(NEWLINE_PREDICATOR, sizeof(char), strlen(NEWLINE_PREDICATOR), stream);
+        fwrite(NEWLINE,            sizeof(char), strlen(NEWLINE),            stream);
     }
 
     fwrite(HEADER_END_INDICATOR, sizeof(char), strlen(HEADER_END_INDICATOR), stream);
@@ -302,7 +305,7 @@ find_keypair_(
 
 size_t
 repurpose_buffer_(
-    size_t* buffer_size,
+    size_t* const buffer_size,
     char** const buffer,
     const char* const new_data
 )

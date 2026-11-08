@@ -7,8 +7,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define HEADER_MAX_LINE_LENGTH 1024
-
 typedef struct huffman_header_keypair_ {
     size_t key_buffer_size_;   // Buffer size of the key, including '\0'
     size_t value_buffer_size_; // Buffer size of the value, including '\0'
