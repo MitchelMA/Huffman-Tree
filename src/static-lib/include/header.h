@@ -27,6 +27,9 @@ void header_clean(huffman_header* header);
 size_t header_get_value(const huffman_header* header, const char* in_key, size_t out_length, char* out_value);
 bool header_contains(const huffman_header* header, const char* in_key);
 
+bool header_replace_key(huffman_header* header, const char* target_key, const char* new_key);
+bool header_replace_value(huffman_header* header, const char* target_key, const char* new_value);
+
 bool header_flush_stream(const huffman_header* header, FILE* stream);
 
 #endif // !HUFFMAN_HUFFMAN_HEADER_H

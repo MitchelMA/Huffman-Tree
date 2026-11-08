@@ -16,6 +16,8 @@
 
 static char* buffer_shift_append_(size_t buffer_size, char* buffer, char symbol);
 static void  keypair_clean_(void* pair);
+static huffman_header_keypair* find_keypair_(const huffman_header* header, const char* key);
+static size_t repurpose_buffer_(size_t* out_buffer_size, char** buffer, const char* new_data);
 
 huffman_header
 parse_header_stream(
@@ -141,30 +143,16 @@ header_get_value(
         header->header_entries_ == NULL)
         return 0;
 
-    const size_t entry_count = vector_get_elem_count(header->header_entries_);
+    huffman_header_keypair* entry = find_keypair_(header, in_key);
 
-    for (size_t i = 0; i < entry_count; i++)
-    {
-        huffman_header_keypair* entry = NULL;
-        if (!vector_elem_at(header->header_entries_, i, (void**)&entry))
-            continue;
+    if (entry == NULL)
+        return 0;
 
-        const size_t key_string_length = strlen(entry->key_string_);
+    const size_t shortest_value_length = MIN(strlen(entry->value_string_), out_length - 1);
 
-        if (key_string_length != strlen(in_key))
-            continue;
-        
-        if (strncmp(entry->key_string_, in_key, key_string_length) != 0)
-            continue;
-
-        const size_t shortest_value_length = MIN(strlen(entry->value_string_), out_length - 1);
-
-        strncpy(out_value, entry->value_string_, shortest_value_length);
-        out_value[shortest_value_length] = '\0';
-        return shortest_value_length;
-    }
-
-    return 0;
+    strncpy(out_value, entry->value_string_, shortest_value_length);
+    out_value[shortest_value_length] = '\0';
+    return shortest_value_length;
 }
 
 bool
@@ -173,31 +161,54 @@ header_contains(
     const char* const in_key
 )
 {
-    if (header == NULL || in_key == NULL || header->header_entries_ == NULL)
-        return false;
-
-    const size_t entry_count = vector_get_elem_count(header->header_entries_);
-
-    for (size_t i = 0; i < entry_count; i++)
-    {
-        huffman_header_keypair* entry = NULL;
-        if (!vector_elem_at(header->header_entries_, i, (void**)&entry))
-            continue;
-
-        const size_t key_string_length = strlen(entry->key_string_);
-
-        if (key_string_length  != strlen(in_key))
-            continue;
-
-        if (strncmp(entry->key_string_, in_key, key_string_length ) != 0)
-            continue;
-
-        return true;
-    }
-
-    return false;
+    return find_keypair_(header, in_key) != NULL;
 }
 
+bool
+header_replace_key(
+    huffman_header* const header,
+    const char* const target_key,
+    const char* const new_key
+)
+{
+    if (header == NULL || header->header_entries_ == NULL ||
+        target_key == NULL || new_key == NULL)
+        return false;
+
+    huffman_header_keypair* entry = find_keypair_(header, target_key);
+
+    if (entry == NULL)
+        return false;
+
+    const size_t repurpose_size = repurpose_buffer_(&entry->key_buffer_size_,
+                                                    &entry->key_string_,
+                                                    new_key);
+
+    return repurpose_size != 0;
+}
+
+bool
+header_replace_value(
+    huffman_header* header,
+    const char* const target_key,
+    const char* const new_value
+)
+{
+    if (header == NULL || header->header_entries_ == NULL ||
+        target_key == NULL || new_value == NULL)
+        return false;
+
+    huffman_header_keypair* entry = find_keypair_(header, target_key);
+
+    if (entry == NULL)
+        return false;
+
+    const size_t repurpose_size = repurpose_buffer_(&entry->value_buffer_size_,
+                                                    &entry->value_string_,
+                                                    new_value);
+
+    return repurpose_size != 0;
+}
 
 bool
 header_flush_stream(
@@ -256,4 +267,59 @@ keypair_clean_(
 
     if (keyvalue->value_string_ != NULL)
         free(keyvalue->value_string_);
+}
+
+huffman_header_keypair*
+find_keypair_(
+    const huffman_header* const header,
+    const char* const key
+)
+{
+    if (header == NULL || header->header_entries_ == NULL)
+        return NULL;
+
+    const size_t entry_count = vector_get_elem_count(header->header_entries_);
+
+    for (size_t i = 0; i < entry_count; i++)
+    {
+        huffman_header_keypair* entry = NULL;
+        if (!vector_elem_at(header->header_entries_, i, (void**)&entry))
+            continue;
+
+        const size_t key_string_length = strlen(entry->key_string_);
+
+        if (key_string_length  != strlen(key))
+            continue;
+
+        if (strncmp(entry->key_string_, key, key_string_length ) != 0)
+            continue;
+
+        return entry;
+    }
+
+    return NULL;
+}
+
+size_t
+repurpose_buffer_(
+    size_t* buffer_size,
+    char** const buffer,
+    const char* const new_data
+)
+{
+     const size_t new_length = strlen(new_data);
+
+    if ((new_length + 1) > *buffer_size)
+    {
+        char* new_ptr = realloc(*buffer, new_length + 1);
+        if (new_ptr == NULL)
+            return 0;
+
+        *buffer = new_ptr;
+        *buffer_size = new_length + 1;
+    }
+
+    strncpy(*buffer, new_data, new_length);
+    (*buffer)[new_length] = '\0';
+    return *buffer_size;
 }

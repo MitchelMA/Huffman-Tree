@@ -129,6 +129,13 @@ int main(void)
     if (fread(buffer, sizeof(char), 127, file) > 0)
         printf("after-header: '%s'\n", buffer);
 
+    header_replace_key(&header, "ja", "pa");
+    header_replace_key(&header, "pa", "dit is een hele lange key waarde die nu gebruikt gaat worden");
+    header_replace_key(&header, "dit is een hele lange key waarde die nu gebruikt gaat worden", "kort");
+    header_replace_value(&header, "kort", "maar krachtig");
+    header_replace_value(&header, "kort", "maar krachtig");
+    header_replace_value(&header, "kort", "kort");
+
     fclose(file);
 
     file = open_file_write("output_header.txt");
