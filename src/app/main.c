@@ -124,13 +124,21 @@ int main(void)
     printf("sleutel: %s (%d)\n", header_buffer, header_contains(&header, "sleutel"));
     header_get_value(&header, "ja", 256, header_buffer);
     printf("ja:      %s (%d)\n", header_buffer, header_contains(&header, "ja"));
-    header_clean(&header);
 
     char buffer[128] = {0};
     if (fread(buffer, sizeof(char), 127, file) > 0)
         printf("after-header: '%s'\n", buffer);
 
     fclose(file);
+
+    file = open_file_write("output_header.txt");
+    header_flush_stream(&header, file);
+    // Test writing after header to stream
+    fputc('a', file);
+
+    fclose(file);
+
+    header_clean(&header);
 }
 
 int main5(void)

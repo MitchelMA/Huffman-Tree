@@ -99,8 +99,10 @@ parse_header_stream(
         strncpy(value_string, value_start,       value_length);
 
         const huffman_header_keypair keypair = {
-            .key_string_   = key_string,
-            .value_string_ = value_string
+            .key_buffer_size_   = key_length + 1,
+            .value_buffer_size_ = value_length + 1,
+            .key_string_        = key_string,
+            .value_string_      = value_string
         };
 
         vector_append(keyvalue_pairs, (void*) &keypair);
@@ -119,7 +121,7 @@ header_clean(
     huffman_header* const header
 )
 {
-    if (header == NULL && header->header_entries_ != NULL)
+    if (header == NULL || header->header_entries_ == NULL)
         return;
 
     vector_clean_deep(header->header_entries_, keypair_clean_);
@@ -194,6 +196,37 @@ header_contains(
     }
 
     return false;
+}
+
+
+bool
+header_flush_stream(
+    const huffman_header* const header,
+    FILE* const stream
+)
+{
+    if (header == NULL || header->header_entries_ == NULL)
+        return false;
+
+    size_t vector_count = vector_get_elem_count(header->header_entries_);
+    huffman_header_keypair* vector_start = (huffman_header_keypair*) vector_get_start_addr_(header->header_entries_);
+
+    for (size_t i = 0; i < vector_count; i++)
+    {
+        const char* const entry_key   = vector_start[i].key_string_;
+        const char* const entry_value = vector_start[i].value_string_;
+        const size_t entry_key_size   = strlen(entry_key);
+        const size_t entry_value_size = strlen(entry_value);
+
+        fwrite(entry_key,   sizeof(char), entry_key_size,   stream);
+        fwrite(":",         sizeof(char), 1,                stream);
+        fwrite(entry_value, sizeof(char), entry_value_size, stream);
+        fwrite(NEWLINE,     sizeof(char), strlen(NEWLINE),  stream);
+    }
+
+    fwrite(HEADER_END_INDICATOR, sizeof(char), strlen(HEADER_END_INDICATOR), stream);
+    fwrite(NEWLINE,              sizeof(char), strlen(NEWLINE),              stream);
+    return true;
 }
 
 
