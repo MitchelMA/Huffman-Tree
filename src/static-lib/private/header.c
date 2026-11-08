@@ -50,7 +50,7 @@ parse_header_stream(
     free(sliding_window_buffer);
 
     // Read the entire header into memory
-    char* const raw_text_buffer = (char*) malloc(sizeof(char) * header_end_pos + 1);
+    char* const raw_text_buffer = (char*) malloc(sizeof(char) * (header_end_pos + 1));
     raw_text_buffer[header_end_pos] = '\0';
     
     if (fread(raw_text_buffer, sizeof(char), header_end_pos, stream) < (size_t) header_end_pos)
@@ -86,23 +86,20 @@ parse_header_stream(
             line_length = (long) strlen(raw_text_buffer + header_line_offsets[i]);
 
         const char* const local_line_string = raw_text_buffer + header_line_offsets[i];
-        void* split_addr                    = memchr(local_line_string, (int)':', line_length);
-
-        const size_t key_length       = (size_t) ((uintptr_t) split_addr - (uintptr_t) local_line_string);
-        const char* const value_start = ((char*) split_addr) + 1;
-        const size_t value_length     = line_length - key_length - 1;
-
-        char* key_string   = malloc(key_length + 1);
-        char* value_string = malloc(value_length + 1);
+        void* const split_addr              = memchr(local_line_string, (int)':', line_length);
+        const size_t key_length             = (size_t) ((uintptr_t) split_addr - (uintptr_t) local_line_string);
+        const char* const value_start       = ((char*) split_addr) + 1;
+        const size_t value_length           = line_length - key_length - 1;
+        char* const key_string              = malloc(key_length + 1);
+        char* const value_string            = malloc(value_length + 1);
 
         key_string[key_length]     = '\0';
         value_string[value_length] = '\0';
-
-        strncpy(key_string, local_line_string, key_length);
-        strncpy(value_string, value_start, value_length);
+        strncpy(key_string,   local_line_string, key_length);
+        strncpy(value_string, value_start,       value_length);
 
         const huffman_header_keypair keypair = {
-            .key_string_ = key_string,
+            .key_string_   = key_string,
             .value_string_ = value_string
         };
 
