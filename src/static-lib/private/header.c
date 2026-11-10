@@ -17,8 +17,8 @@
 
 static char* buffer_shift_append_(size_t buffer_size, char* buffer, char symbol);
 static void  keypair_clean_(void* pair);
-static huffman_header_keypair* find_keypair_(const huffman_header* header, const char* key);
-static size_t repurpose_buffer_(size_t* out_buffer_size, char** buffer, const char* new_data);
+static huffman_header_keypair* find_keypair_(const huffman_header* header, size_t key_length, const char* key);
+static size_t repurpose_buffer_(size_t* out_buffer_size, char** buffer, const char* new_data, size_t new_data_size);
 
 huffman_header
 parse_header_stream(
@@ -40,7 +40,8 @@ parse_header_stream(
     {
         buffer_shift_append_(sliding_window_size, sliding_window_buffer, (char)sym);
         
-        if (strstr(sliding_window_buffer, NEWLINE_PREDICATOR NEWLINE) == sliding_window_buffer)
+        if (strnstr(sliding_window_buffer, sliding_window_size,
+                    NEWLINE_PREDICATOR NEWLINE, newline_pred_size + newline_size) == sliding_window_buffer)
             header_line_count++;
         
         if (strncmp(HEADER_END_INDICATOR, sliding_window_buffer, sliding_window_size) == 0)
@@ -73,9 +74,10 @@ parse_header_stream(
 
     for (long i = 1; i < header_line_count; i++)
     {
-        void* line_end_addr    = strstr(raw_text_buffer_pos, NEWLINE_PREDICATOR NEWLINE);
+        const char* line_end_addr    = strnstr(raw_text_buffer_pos, header_end_pos,
+                                               NEWLINE_PREDICATOR NEWLINE, newline_pred_size + newline_size);
         int local_offset       = (int)  ((uintptr_t) line_end_addr - (uintptr_t) raw_text_buffer);
-        raw_text_buffer_pos    = (void*) ((uintptr_t) line_end_addr + newline_size + newline_pred_size);
+        raw_text_buffer_pos    = (char*) ((uintptr_t) line_end_addr + newline_size + newline_pred_size);
         header_line_offsets[i] = local_offset + newline_size + newline_pred_size;
     }
 
@@ -87,7 +89,7 @@ parse_header_stream(
         if (i < header_line_count - 1)
             line_length = (long) (header_line_offsets[i+1] - header_line_offsets[i] - (newline_size + newline_pred_size));
         else
-            line_length = (long) strlen(raw_text_buffer + header_line_offsets[i]) - (newline_size + newline_pred_size);
+            line_length = (long) (header_end_pos - header_line_offsets[i] - (newline_pred_size + newline_size));
 
         const char* const local_line_string = raw_text_buffer + header_line_offsets[i];
         void* const split_addr              = memchr(local_line_string, (int)':', line_length);
@@ -99,14 +101,16 @@ parse_header_stream(
 
         key_string[key_length]     = '\0';
         value_string[value_length] = '\0';
-        strncpy(key_string,   local_line_string, key_length);
-        strncpy(value_string, value_start,       value_length);
+        memcpy(key_string,   local_line_string, key_length);
+        memcpy(value_string, value_start,       value_length);
 
         const huffman_header_keypair keypair = {
-            .key_buffer_size_   = key_length + 1,
-            .value_buffer_size_ = value_length + 1,
-            .key_string_        = key_string,
-            .value_string_      = value_string
+            .key_buffer_size_     = key_length + 1,
+            .value_buffer_size_   = value_length + 1,
+            .key_string_length_   = key_length,
+            .value_string_length_ = value_length,
+            .key_string_          = key_string,
+            .value_string_        = value_string
         };
 
         vector_append(keyvalue_pairs, (void*) &keypair);
@@ -136,6 +140,7 @@ header_clean(
 size_t
 header_get_value(
     const huffman_header* const header,
+    const size_t in_key_length,
     const char* const in_key,
     const size_t out_length,
     char* const out_value
@@ -145,12 +150,12 @@ header_get_value(
         header->header_entries_ == NULL)
         return 0;
 
-    huffman_header_keypair* entry = find_keypair_(header, in_key);
+    huffman_header_keypair* entry = find_keypair_(header, in_key_length, in_key);
 
     if (entry == NULL)
         return 0;
 
-    const size_t shortest_value_length = MIN(strlen(entry->value_string_), out_length - 1);
+    const size_t shortest_value_length = MIN(entry->value_string_length_, out_length - 1);
 
     strncpy(out_value, entry->value_string_, shortest_value_length);
     out_value[shortest_value_length] = '\0';
@@ -160,16 +165,19 @@ header_get_value(
 bool
 header_contains(
     const huffman_header* const header,
+    const size_t in_key_length,
     const char* const in_key
 )
 {
-    return find_keypair_(header, in_key) != NULL;
+    return find_keypair_(header, in_key_length, in_key) != NULL;
 }
 
 bool
 header_replace_key(
     huffman_header* const header,
+    const size_t target_key_length,
     const char* const target_key,
+    const size_t new_key_length,
     const char* const new_key
 )
 {
@@ -177,14 +185,18 @@ header_replace_key(
         target_key == NULL || new_key == NULL)
         return false;
 
-    huffman_header_keypair* entry = find_keypair_(header, target_key);
+    huffman_header_keypair* entry = find_keypair_(header, target_key_length, target_key);
 
     if (entry == NULL)
         return false;
 
     const size_t repurpose_size = repurpose_buffer_(&entry->key_buffer_size_,
                                                     &entry->key_string_,
-                                                    new_key);
+                                                    new_key,
+                                                    new_key_length);
+
+    if (repurpose_size != 0)
+        entry->key_string_length_ = new_key_length;
 
     return repurpose_size != 0;
 }
@@ -192,7 +204,9 @@ header_replace_key(
 bool
 header_replace_value(
     huffman_header* header,
+    const size_t target_key_length,
     const char* const target_key,
+    const size_t new_value_length,
     const char* const new_value
 )
 {
@@ -200,14 +214,18 @@ header_replace_value(
         target_key == NULL || new_value == NULL)
         return false;
 
-    huffman_header_keypair* entry = find_keypair_(header, target_key);
+    huffman_header_keypair* entry = find_keypair_(header, target_key_length, target_key);
 
     if (entry == NULL)
         return false;
 
     const size_t repurpose_size = repurpose_buffer_(&entry->value_buffer_size_,
                                                     &entry->value_string_,
-                                                    new_value);
+                                                    new_value,
+                                                    new_value_length);
+
+    if (repurpose_size != 0)
+        entry->value_string_length_ = new_value_length;
 
     return repurpose_size != 0;
 }
@@ -228,8 +246,8 @@ header_flush_stream(
     {
         const char* const entry_key   = vector_start[i].key_string_;
         const char* const entry_value = vector_start[i].value_string_;
-        const size_t entry_key_size   = strlen(entry_key);
-        const size_t entry_value_size = strlen(entry_value);
+        const size_t entry_key_size   = vector_start[i].key_string_length_;
+        const size_t entry_value_size = vector_start[i].value_string_length_;
 
         fwrite(entry_key,          sizeof(char), entry_key_size,             stream);
         fwrite(":",                sizeof(char), 1,                          stream);
@@ -275,6 +293,7 @@ keypair_clean_(
 huffman_header_keypair*
 find_keypair_(
     const huffman_header* const header,
+    const size_t key_length,
     const char* const key
 )
 {
@@ -289,12 +308,10 @@ find_keypair_(
         if (!vector_elem_at(header->header_entries_, i, (void**)&entry))
             continue;
 
-        const size_t key_string_length = strlen(entry->key_string_);
-
-        if (key_string_length  != strlen(key))
+        if (entry->key_string_length_ != key_length)
             continue;
 
-        if (strncmp(entry->key_string_, key, key_string_length ) != 0)
+        if (strncmp(entry->key_string_, key, entry->key_string_length_) != 0)
             continue;
 
         return entry;
@@ -307,22 +324,22 @@ size_t
 repurpose_buffer_(
     size_t* const buffer_size,
     char** const buffer,
-    const char* const new_data
+    const char* const new_data,
+    const size_t new_data_size
 )
 {
-     const size_t new_length = strlen(new_data);
-
-    if ((new_length + 1) > *buffer_size)
+    if ((new_data_size + 1) > *buffer_size)
     {
-        char* new_ptr = realloc(*buffer, new_length + 1);
+        char* new_ptr = realloc(*buffer, new_data_size + 1);
         if (new_ptr == NULL)
             return 0;
 
         *buffer = new_ptr;
-        *buffer_size = new_length + 1;
+        *buffer_size = new_data_size + 1;
     }
 
-    strncpy(*buffer, new_data, new_length);
-    (*buffer)[new_length] = '\0';
+    // strncpy(*buffer, new_data, new_data_size);
+    memcpy(*buffer, new_data, new_data_size);
+    (*buffer)[new_data_size] = '\0';
     return *buffer_size;
 }

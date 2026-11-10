@@ -118,23 +118,24 @@ int main(void)
     FILE* file = open_file_read("header.txt");
     huffman_header header = parse_header_stream(file);
     char header_buffer[256] = {0};
-    header_get_value(&header, "key", 256, header_buffer);
-    printf("key:     '%s' (%d)\n", header_buffer, header_contains(&header, "key"));
-    header_get_value(&header, "sleutel", 256, header_buffer);
-    printf("sleutel: '%s' (%d)\n", header_buffer, header_contains(&header, "sleutel"));
-    header_get_value(&header, "ja", 256, header_buffer);
-    printf("ja:      '%s' (%d)\n", header_buffer, header_contains(&header, "ja"));
+    header_get_value_s(&header, "key", 256, header_buffer);
+    printf("key:     '%s' (%d)\n", header_buffer, header_contains_s(&header, "key"));
+    header_get_value_s(&header, "sleutel", 256, header_buffer);
+    printf("sleutel: '%s' (%d)\n", header_buffer, header_contains_s(&header, "sleutel"));
+    header_get_value_s(&header, "ja", 256, header_buffer);
+    printf("ja:      '%s' (%d)\n", header_buffer, header_contains_s(&header, "ja"));
 
     char buffer[128] = {0};
     if (fread(buffer, sizeof(char), 127, file) > 0)
         printf("after-header: '%s'\n", buffer);
 
-    header_replace_key(&header, "ja", "pa");
-    header_replace_key(&header, "pa", "dit is een hele lange key waarde die nu gebruikt gaat worden");
-    header_replace_key(&header, "dit is een hele lange key waarde die nu gebruikt gaat worden", "kort");
-    header_replace_value(&header, "kort", "maar krachtig");
-    header_replace_value(&header, "kort", "maar krachtig");
-    header_replace_value(&header, "kort", "kort");
+    header_replace_key_s(&header, "ja", "pa");
+    header_replace_key_s(&header, "pa", "dit is een hele lange key waarde die nu gebruikt gaat worden");
+    header_replace_key_s(&header, "dit is een hele lange key waarde die nu gebruikt gaat worden", "kort");
+    header_replace_value_s(&header, "kort", "maar krachtig");
+    header_replace_value_s(&header, "kort", "maar krachtig");
+    header_replace_key(&header, 4, "kort", 5, "k\0ort");
+    header_replace_value(&header, 5, "k\0ort", 5, "k\0ort");
 
     fclose(file);
 

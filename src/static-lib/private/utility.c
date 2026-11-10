@@ -30,3 +30,24 @@ memrev(
 
     return src;
 }
+
+const char*
+strnstr(
+    const char* const haystack,
+    const size_t haystack_size,
+    const char* const needle,
+    const size_t needle_size
+)
+{
+    if (needle_size > haystack_size)
+        return NULL;
+
+    for (size_t i = 0; i < haystack_size - needle_size; i++)
+    {
+        int comparison = strncmp(haystack + i, needle, needle_size);
+        if (comparison == 0)
+            return haystack + i;
+    }
+
+    return NULL;
+}
