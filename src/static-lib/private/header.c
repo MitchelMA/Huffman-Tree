@@ -74,8 +74,9 @@ parse_header_stream(
 
     for (long i = 1; i < header_line_count; i++)
     {
-        const char* line_end_addr    = strnstr(raw_text_buffer_pos, header_end_pos,
-                                               NEWLINE_PREDICATOR NEWLINE, newline_pred_size + newline_size);
+        const char* line_end_addr = strnstr(raw_text_buffer_pos, header_end_pos,
+                                            NEWLINE_PREDICATOR NEWLINE, newline_pred_size + newline_size);
+
         int local_offset       = (int)  ((uintptr_t) line_end_addr - (uintptr_t) raw_text_buffer);
         raw_text_buffer_pos    = (char*) ((uintptr_t) line_end_addr + newline_size + newline_pred_size);
         header_line_offsets[i] = local_offset + newline_size + newline_pred_size;
@@ -157,7 +158,7 @@ header_get_value(
 
     const size_t shortest_value_length = MIN(entry->value_string_length_, out_length - 1);
 
-    strncpy(out_value, entry->value_string_, shortest_value_length);
+    memcpy(out_value, entry->value_string_, shortest_value_length);
     out_value[shortest_value_length] = '\0';
     return shortest_value_length;
 }
@@ -338,7 +339,6 @@ repurpose_buffer_(
         *buffer_size = new_data_size + 1;
     }
 
-    // strncpy(*buffer, new_data, new_data_size);
     memcpy(*buffer, new_data, new_data_size);
     (*buffer)[new_data_size] = '\0';
     return *buffer_size;

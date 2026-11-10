@@ -28,6 +28,8 @@ memrev(
         last -= size;
     }
 
+    memset(temp_buffer, 0, size);
+
     return src;
 }
 
