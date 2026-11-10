@@ -57,7 +57,7 @@ parse_header_stream(
     // Read the entire header into memory
     char* const raw_text_buffer = (char*) malloc(sizeof(char) * (header_end_pos + 1));
     raw_text_buffer[header_end_pos] = '\0';
-    
+
     if (fread(raw_text_buffer, sizeof(char), header_end_pos, stream) < (size_t) header_end_pos)
     {
         free(raw_text_buffer);
