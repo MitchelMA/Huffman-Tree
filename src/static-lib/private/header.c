@@ -125,6 +125,14 @@ parse_header_stream(
     };
 }
 
+huffman_header
+header_create_empty()
+{
+    return (huffman_header) {
+        .header_entries_ = vector_create(sizeof(huffman_header_keypair))
+    };
+}
+
 void
 header_clean(
     huffman_header* const header
@@ -229,6 +237,85 @@ header_replace_value(
         entry->value_string_length_ = new_value_length;
 
     return repurpose_size != 0;
+}
+
+bool
+header_remove_entry(
+    huffman_header* const header,
+    const size_t target_key_length,
+    const char* const target_key
+)
+{
+    if (header == NULL || header->header_entries_ == NULL)
+        return false;
+
+    const uintptr_t entry_array_start = (uintptr_t) vector_get_start_addr_(header->header_entries_);
+
+    if (entry_array_start == 0)
+        return false;
+
+    const uintptr_t entry_addr = (uintptr_t) find_keypair_(header, target_key_length, target_key);
+
+    if (entry_addr == 0)
+        return false;
+
+    const intptr_t local_offset = entry_addr - entry_array_start;
+    const size_t   index        = local_offset / sizeof(huffman_header_keypair);
+
+    huffman_header_keypair cleanup_entry = {0};
+    bool success = vector_remove_at(header->header_entries_, index, (void*) &cleanup_entry);
+
+    if (!success)
+        return false;
+
+    keypair_clean_((void*) &cleanup_entry);
+    return true;
+}
+
+bool
+header_add_entry(
+    huffman_header* const header,
+    const size_t key_length,
+    const char* const key,
+    const size_t value_length,
+    const char* const value
+)
+{
+    if (header == NULL || header->header_entries_ == NULL)
+        return false;
+
+    if (find_keypair_(header, key_length, key) != NULL)
+        return false;
+
+    char* const key_buffer = malloc(key_length + 1);
+    if (key_buffer == NULL)
+        return false;
+
+    char* const value_buffer = malloc(value_length + 1);
+    if (value_buffer == NULL)
+    {
+        free(key_buffer);
+        return false;
+    }
+
+    key_buffer[key_length]     = '\0';
+    value_buffer[value_length] = '\0';
+
+    memcpy(key_buffer,   key,   key_length);
+    memcpy(value_buffer, value, value_length);
+
+    const huffman_header_keypair entry = {
+        .key_buffer_size_     = key_length + 1,
+        .value_buffer_size_   = value_length + 1,
+        .key_string_length_   = key_length,
+        .value_string_length_ = value_length,
+        .key_string_          = key_buffer,
+        .value_string_        = value_buffer
+    };
+
+    vector_append(header->header_entries_, (void*) &entry);
+
+    return true;
 }
 
 bool

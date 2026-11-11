@@ -136,17 +136,21 @@ int main(void)
     header_replace_value_s(&header, "kort", "maar krachtig");
     header_replace_key(&header, 4, "kort", 5, "k\0ort");
     header_replace_value(&header, 5, "k\0ort", 5, "k\0ort");
+    header_remove_entry_s(&header, "ander");
+    header_add_entry(&header, 3, "wat", 6, "pa\0tat");
 
     fclose(file);
 
     file = open_file_write("output_header.txt");
     header_flush_stream(&header, file);
+    header_clean(&header);
+
     // Test writing after header to stream
     fputc('a', file);
 
     fclose(file);
 
-    header_clean(&header);
+    return EXIT_SUCCESS;
 }
 
 int main5(void)

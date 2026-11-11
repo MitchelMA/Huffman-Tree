@@ -23,6 +23,7 @@ typedef struct huffman_header_ {
 } huffman_header;
 
 huffman_header parse_header_stream(FILE* stream);
+huffman_header header_create_empty();
 void header_clean(huffman_header* header);
 
 size_t header_get_value(const huffman_header* header, size_t in_key_length, const char* in_key, size_t out_length, char* out_value);
@@ -34,6 +35,11 @@ bool header_replace_key(huffman_header* header, size_t target_key_length, const 
 #define header_replace_key_s(header_, target_key_, new_key_) header_replace_key(header_, strlen(target_key_), target_key_, strlen(new_key_), new_key_)
 bool header_replace_value(huffman_header* header, size_t target_key_length, const char* target_key, size_t new_value_length, const char* new_value);
 #define header_replace_value_s(header_, target_key_, new_value_) header_replace_value(header_, strlen(target_key_), target_key_, strlen(new_value_), new_value_)
+
+bool header_remove_entry(huffman_header* header, size_t target_key_length, const char* target_key);
+#define header_remove_entry_s(header_, key_) header_remove_entry(header_, strlen(key_), key_)
+bool header_add_entry(huffman_header* header, size_t key_length, const char* key, size_t value_length, const char* value);
+#define header_add_entry_s(header_, key_, value_) header_add_entry(header_, strlen(key_), key_, strlen(value_), value_)
 
 bool header_flush_stream(const huffman_header* header, FILE* stream);
 
