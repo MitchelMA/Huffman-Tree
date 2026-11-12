@@ -5,7 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 
+#define SLIDING_WINDOW_MAX_SIZE 32
 #define HEADER_END_INDICATOR "---"
 
 #define NEWLINE_PREDICATOR "-"
@@ -28,11 +30,11 @@ parse_header_stream(
     const size_t newline_pred_size    = strlen(NEWLINE_PREDICATOR);
     const size_t newline_size         = strlen(NEWLINE);
     const size_t sliding_window_size  = strlen(HEADER_END_INDICATOR);
-    char* const sliding_window_buffer = malloc(sliding_window_size + 1);
     long header_end_pos               = 0;
     long header_line_count            = 0;
+    char sliding_window_buffer[SLIDING_WINDOW_MAX_SIZE] = {0};
 
-    memset(sliding_window_buffer, 0, sliding_window_size + 1);
+    assert(SLIDING_WINDOW_MAX_SIZE > sliding_window_size);
 
     // Calculate the end of the header
     int sym = EOF;
@@ -51,8 +53,6 @@ parse_header_stream(
             break;
         }
     }
-
-    free(sliding_window_buffer);
 
     // Read the entire header into memory
     char* const raw_text_buffer = (char*) malloc(sizeof(char) * (header_end_pos + 1));
