@@ -34,6 +34,7 @@ parse_header_stream(
     long header_line_count            = 0;
     char sliding_window_buffer[SLIDING_WINDOW_MAX_SIZE] = {0};
 
+    assert(newline_pred_size + newline_size <= sliding_window_size);
     assert(SLIDING_WINDOW_MAX_SIZE > sliding_window_size);
 
     // Calculate the end of the header
