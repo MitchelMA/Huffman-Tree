@@ -19,8 +19,10 @@
 
 static char* buffer_shift_append_(size_t buffer_size, char* buffer, char symbol);
 static void  keypair_clean_(void* pair);
+static huffman_header_keypair* vector_find_keypair_(const vector_t* header_entries, size_t key_length, const char* key);
 static huffman_header_keypair* find_keypair_(const huffman_header* header, size_t key_length, const char* key);
 static size_t repurpose_buffer_(size_t* out_buffer_size, char** buffer, const char* new_data, size_t new_data_size);
+static bool vector_add_keypair_(vector_t* header_entries, size_t key_length, const char* key, size_t value_length, const char* value);
 
 huffman_header
 parse_header_stream(
@@ -98,24 +100,12 @@ parse_header_stream(
         const size_t key_length             = (size_t) ((uintptr_t) split_addr - (uintptr_t) local_line_string);
         const char* const value_start       = ((char*) split_addr) + 1;
         const size_t value_length           = line_length - key_length - 1;
-        char* const key_string              = malloc(key_length + 1);
-        char* const value_string            = malloc(value_length + 1);
 
-        key_string[key_length]     = '\0';
-        value_string[value_length] = '\0';
-        memcpy(key_string,   local_line_string, key_length);
-        memcpy(value_string, value_start,       value_length);
-
-        const huffman_header_keypair keypair = {
-            .key_buffer_size_     = key_length + 1,
-            .value_buffer_size_   = value_length + 1,
-            .key_string_length_   = key_length,
-            .value_string_length_ = value_length,
-            .key_string_          = key_string,
-            .value_string_        = value_string
-        };
-
-        vector_append(keyvalue_pairs, (void*) &keypair);
+        vector_add_keypair_(keyvalue_pairs,
+                            key_length,
+                            local_line_string,
+                            value_length,
+                            value_start);
     }
 
     free(raw_text_buffer);
@@ -282,41 +272,10 @@ header_add_entry(
     const char* const value
 )
 {
-    if (header == NULL || header->header_entries_ == NULL)
+    if (header == NULL)
         return false;
 
-    if (find_keypair_(header, key_length, key) != NULL)
-        return false;
-
-    char* const key_buffer = malloc(key_length + 1);
-    if (key_buffer == NULL)
-        return false;
-
-    char* const value_buffer = malloc(value_length + 1);
-    if (value_buffer == NULL)
-    {
-        free(key_buffer);
-        return false;
-    }
-
-    key_buffer[key_length]     = '\0';
-    value_buffer[value_length] = '\0';
-
-    memcpy(key_buffer,   key,   key_length);
-    memcpy(value_buffer, value, value_length);
-
-    const huffman_header_keypair entry = {
-        .key_buffer_size_     = key_length + 1,
-        .value_buffer_size_   = value_length + 1,
-        .key_string_length_   = key_length,
-        .value_string_length_ = value_length,
-        .key_string_          = key_buffer,
-        .value_string_        = value_buffer
-    };
-
-    vector_append(header->header_entries_, (void*) &entry);
-
-    return true;
+    return vector_add_keypair_(header->header_entries_, key_length, key, value_length, value);
 }
 
 bool
@@ -380,21 +339,21 @@ keypair_clean_(
 }
 
 huffman_header_keypair*
-find_keypair_(
-    const huffman_header* const header,
-    const size_t key_length,
-    const char* const key
+vector_find_keypair_(
+    const vector_t* header_entries,
+    size_t key_length,
+    const char* key
 )
 {
-    if (header == NULL || header->header_entries_ == NULL)
+     if (header_entries == NULL)
         return NULL;
 
-    const size_t entry_count = vector_get_elem_count(header->header_entries_);
+    const size_t entry_count = vector_get_elem_count(header_entries);
 
     for (size_t i = 0; i < entry_count; i++)
     {
         huffman_header_keypair* entry = NULL;
-        if (!vector_elem_at(header->header_entries_, i, (void**)&entry))
+        if (!vector_elem_at(header_entries, i, (void**)&entry))
             continue;
 
         if (entry->key_string_length_ != key_length)
@@ -407,6 +366,19 @@ find_keypair_(
     }
 
     return NULL;
+}
+
+huffman_header_keypair*
+find_keypair_(
+    const huffman_header* const header,
+    const size_t key_length,
+    const char* const key
+)
+{
+    if (header == NULL)
+        return NULL;
+
+    return vector_find_keypair_(header->header_entries_, key_length, key);
 }
 
 size_t
@@ -430,4 +402,50 @@ repurpose_buffer_(
     memcpy(*buffer, new_data, new_data_size);
     (*buffer)[new_data_size] = '\0';
     return *buffer_size;
+}
+
+bool
+vector_add_keypair_(
+    vector_t* const header_entries,
+    const size_t key_length,
+    const char* const key,
+    const size_t value_length,
+    const char* const value
+)
+{
+    if (header_entries == NULL || key == NULL || value == NULL)
+        return false;
+
+    if (vector_find_keypair_(header_entries, key_length, key) != NULL)
+        return false;
+
+    char* const key_buffer = malloc(key_length + 1);
+    if (key_buffer == NULL)
+        return false;
+
+    char* const value_buffer = malloc(value_length + 1);
+    if (value_buffer == NULL)
+    {
+        free(key_buffer);
+        return false;
+    }
+
+    key_buffer[key_length]     = '\0';
+    value_buffer[value_length] = '\0';
+
+    memcpy(key_buffer,   key,   key_length);
+    memcpy(value_buffer, value, value_length);
+
+    const huffman_header_keypair entry = {
+        .key_buffer_size_     = key_length + 1,
+        .value_buffer_size_   = value_length + 1,
+        .key_string_length_   = key_length,
+        .value_string_length_ = value_length,
+        .key_string_          = key_buffer,
+        .value_string_        = value_buffer
+    };
+
+    vector_append(header_entries, (void*) &entry);
+
+    return true;
 }
