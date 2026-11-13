@@ -9,6 +9,7 @@
 #include "huffman_processing.h"
 #include "bitarray.h"
 #include "io.h"
+#include "header.h"
 
 #include "timer.h"
 
@@ -112,6 +113,46 @@ void print_bitarr_old(const bitarray* bitarray)
     printf(" (%d)", length);
 }
 
+int main(void)
+{
+    FILE* file = open_file_read("header.txt");
+    huffman_header header = parse_header_stream(file);
+    char header_buffer[256] = {0};
+    header_get_value_s(&header, "key", 256, header_buffer);
+    printf("key:     '%s' (%d)\n", header_buffer, header_contains_s(&header, "key"));
+    header_get_value_s(&header, "sleutel", 256, header_buffer);
+    printf("sleutel: '%s' (%d)\n", header_buffer, header_contains_s(&header, "sleutel"));
+    header_get_value_s(&header, "ja", 256, header_buffer);
+    printf("ja:      '%s' (%d)\n", header_buffer, header_contains_s(&header, "ja"));
+
+    char buffer[128] = {0};
+    if (fread(buffer, sizeof(char), 127, file) > 0)
+        printf("after-header: '%s'\n", buffer);
+
+    header_replace_key_s(&header, "ja", "pa");
+    header_replace_key_s(&header, "pa", "dit is een hele lange key waarde die nu gebruikt gaat worden");
+    header_replace_key_s(&header, "dit is een hele lange key waarde die nu gebruikt gaat worden", "kort");
+    header_replace_value_s(&header, "kort", "maar krachtig");
+    header_replace_value_s(&header, "kort", "maar krachtig");
+    header_replace_key(&header, 4, "kort", 5, "k\0ort");
+    header_replace_value(&header, 5, "k\0ort", 5, "k\0ort");
+    header_remove_entry_s(&header, "ander");
+    header_add_entry(&header, 3, "wat", 6, "pa\0tat");
+
+    fclose(file);
+
+    file = open_file_write("output_header.txt");
+    header_flush_stream(&header, file);
+    header_clean(&header);
+
+    // Test writing after header to stream
+    fputc('a', file);
+
+    fclose(file);
+
+    return EXIT_SUCCESS;
+}
+
 int main5(void)
 {
     const bool boolarr[] = { 0, 1, 1, 0, 1, 1 };
@@ -133,7 +174,7 @@ int main5(void)
     return EXIT_SUCCESS;
 }
 
-int main(void)
+int main6(void)
 {
     setlocale(LC_ALL, "");
     struct timer duration_timer = {};

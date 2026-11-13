@@ -43,6 +43,7 @@ do { \
 #endif
 
 void* memrev(void* src, size_t n, size_t size);
+const char* strnstr(const char* haystack, size_t haystack_size, const char* needle, size_t needle_size);
 
 #endif // !HUFFMAN_HUFFMAN_UTILITY_H
 
