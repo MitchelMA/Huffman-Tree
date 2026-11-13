@@ -57,6 +57,13 @@ parse_header_stream(
         }
     }
 
+    if (header_line_count <= 0)
+    {
+        // Set the cursor to the line directly after the header-end
+        fseek(stream, header_end_pos + 2 * newline_size + sliding_window_size - newline_pred_size, SEEK_SET);
+        return header_create_empty();
+    }
+
     // Read the entire header into memory
     char* const raw_text_buffer = (char*) malloc(sizeof(char) * (header_end_pos + 1));
     raw_text_buffer[header_end_pos] = '\0';
