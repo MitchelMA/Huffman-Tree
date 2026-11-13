@@ -87,7 +87,7 @@ parse_header_stream(
         const char* line_end_addr = strnstr(raw_text_buffer_pos, header_end_pos,
                                             NEWLINE_PREDICATOR NEWLINE, newline_pred_size + newline_size);
 
-        int local_offset       = (int)  ((uintptr_t) line_end_addr - (uintptr_t) raw_text_buffer);
+        int local_offset       = (int)   ((uintptr_t) line_end_addr - (uintptr_t) raw_text_buffer);
         raw_text_buffer_pos    = (char*) ((uintptr_t) line_end_addr + newline_size + newline_pred_size);
         header_line_offsets[i] = local_offset + newline_size + newline_pred_size;
     }
