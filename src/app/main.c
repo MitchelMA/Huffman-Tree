@@ -115,7 +115,33 @@ void print_bitarr_old(const bitarray* bitarray)
 
 int main(void)
 {
-    puts("Hello, World!");
+    setlocale(LC_ALL, "");
+    huffman_node tree_root = {0};
+    const char* text_filename;
+    const char* ser_filename;
+    FILE* text_fp    = NULL;
+    FILE* ser_fp     = NULL;
+
+    text_filename = "./input";
+    ser_filename  = "./output";
+
+    text_fp  = open_file_read(text_filename);
+
+    dlinked_list_node* linked_list = huffman_count_stream_table(text_fp);
+    tree_root = huffman_construct_tree(linked_list);
+
+    fclose(text_fp);
+
+    char serialisation_buffer[4096] = {0};
+    const size_t data_length = huffman_serialise_tree(&tree_root, 4096, serialisation_buffer);
+    huffman_node_clean(&tree_root);
+
+    ser_fp = open_file_write(ser_filename);
+
+    printf("%ld\n", data_length);
+    fwrite(serialisation_buffer, sizeof(char), data_length, ser_fp);
+    fclose(ser_fp);
+
     return EXIT_SUCCESS;
 }
 

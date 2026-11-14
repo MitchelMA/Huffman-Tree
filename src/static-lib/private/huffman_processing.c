@@ -2,6 +2,7 @@
 
 #include "utility.h"
 #include "io.h"
+#include "bitarray.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -325,6 +326,56 @@ huffman_unflatten_tree(
     }
 
     return parent;
+}
+
+size_t
+huffman_serialise_tree(
+    const huffman_node* const root,
+    const size_t buffer_size,
+    char* const output_buffer
+)
+{
+    flat_tree_value flattened[FLAT_TREE_SIZE] = {0};
+    huffman_flatten_tree(root, flattened);
+
+    bitarray bit_array = {0};
+    size_t buffer_pos = 0;
+
+    for (int symb = 0; symb < FLAT_TREE_SIZE && buffer_pos < buffer_size; symb++)
+    {
+        size_t path_length     = flattened[symb].length;
+        const bool* const path = flattened[symb].path;
+
+        // Ignore symbols that aren't part of the tree
+        if (path_length <= 0)
+            continue;
+
+        bitarray_init_in_mem(&bit_array);
+
+        if (bitarray_append_bits(&bit_array, path_length, path) < (int64_t) path_length)
+        {
+            assert(false && "Failed to append correct bits to bitarray");
+        }
+
+        size_t byte_filling_count = (path_length >> 3) + ((path_length & 0b111) > 0);
+        uint8_t* raw_bytes = vector_get_start_addr_(bit_array.in_mem.content);
+
+        assert(path_length < 256);
+
+        if (buffer_pos < buffer_size)
+        {
+            output_buffer[buffer_pos++] = (char) symb;
+            output_buffer[buffer_pos++] = (char) path_length;
+            memcpy(output_buffer + buffer_pos, raw_bytes, byte_filling_count);
+            buffer_pos += byte_filling_count;
+        }
+
+        bitarray_clean(&bit_array);
+    }
+
+    output_buffer[buffer_pos] = '\0';
+
+    return buffer_pos;
 }
 
 bitarray_length_t
