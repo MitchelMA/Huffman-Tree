@@ -332,7 +332,7 @@ size_t
 huffman_serialise_tree(
     const huffman_node* const root,
     const size_t buffer_size,
-    char* const output_buffer
+    uint8_t* const output_buffer
 )
 {
     flat_tree_value flattened[FLAT_TREE_SIZE] = {0};
@@ -364,8 +364,8 @@ huffman_serialise_tree(
 
         if (buffer_pos < buffer_size)
         {
-            output_buffer[buffer_pos++] = (char) symb;
-            output_buffer[buffer_pos++] = (char) path_length;
+            output_buffer[buffer_pos++] = (uint8_t) symb;
+            output_buffer[buffer_pos++] = (uint8_t) path_length;
             memcpy(output_buffer + buffer_pos, raw_bytes, byte_filling_count);
             buffer_pos += byte_filling_count;
         }
@@ -376,6 +376,46 @@ huffman_serialise_tree(
     output_buffer[buffer_pos] = '\0';
 
     return buffer_pos;
+}
+
+huffman_node
+huffman_deserialise_tree(
+    const uint8_t* const data,
+    const size_t buffer_size
+)
+{
+    // Flat tree used for eventual unflattening
+    flat_tree_value flat[FLAT_TREE_SIZE] = {0};
+    uint8_t byte_values[128] = {0};
+
+    size_t buffer_pos = 0;
+
+    // Read entries in the format <sym><bit-count><bit-path-values>
+    bitarray bit_array = {0};
+    while (buffer_pos < buffer_size)
+    {
+        uint8_t symbol    = (uint8_t) data[buffer_pos++];
+        uint8_t bit_count = (uint8_t) data[buffer_pos++];
+        uint8_t byte_size = (uint8_t) (bit_count >> 3) + ((bit_count & 0b111) > 0);
+        memcpy(byte_values, data + buffer_pos, byte_size);
+        buffer_pos += byte_size;
+
+        // Unpack bitarray magic
+        bit_array.kind = BITARRAY_IN_MEM;
+        bit_array.in_mem.content = vector_create_from(sizeof(char), byte_size, (void*) byte_values);
+        bit_array.in_mem.bit_offset = bit_count & 0b111;
+
+        flat[symbol].length = bit_count;
+        if (bitarray_read_bits(&bit_array, 0, bit_count, flat[symbol].path) < bit_count)
+        {
+            assert(false && "Failed to get correct amount of bits back during deserialisation");
+        }
+
+        bitarray_clean(&bit_array);
+        memset(byte_values, 0, 128);
+    }
+
+    return huffman_unflatten_tree(flat);
 }
 
 bitarray_length_t

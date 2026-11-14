@@ -132,14 +132,30 @@ int main(void)
 
     fclose(text_fp);
 
-    char serialisation_buffer[4096] = {0};
-    const size_t data_length = huffman_serialise_tree(&tree_root, 4096, serialisation_buffer);
+    uint8_t serialisation_buffer[4096] = {0};
+    size_t data_length = huffman_serialise_tree(&tree_root, 4096, serialisation_buffer);
     huffman_node_clean(&tree_root);
 
     ser_fp = open_file_write(ser_filename);
 
     printf("%ld\n", data_length);
     fwrite(serialisation_buffer, sizeof(char), data_length, ser_fp);
+
+    rewind(ser_fp);
+    memset(serialisation_buffer, 0, 4096);
+
+    data_length = fread(serialisation_buffer, sizeof(char), 4096, ser_fp);
+    tree_root = huffman_deserialise_tree(serialisation_buffer, data_length);
+
+    fclose(ser_fp);
+
+    ser_fp = open_file_write("new_ser");
+
+    data_length = huffman_serialise_tree(&tree_root, 4096, serialisation_buffer);
+    huffman_node_clean(&tree_root);
+
+    fwrite(serialisation_buffer, sizeof(char), data_length, ser_fp);
+
     fclose(ser_fp);
 
     return EXIT_SUCCESS;
