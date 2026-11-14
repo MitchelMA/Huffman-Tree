@@ -273,6 +273,60 @@ huffman_flatten_tree(
     return flattened_count;
 }
 
+
+huffman_node
+huffman_unflatten_tree(
+    const flat_tree_value* const flat
+)
+{
+
+    huffman_node parent = {0};
+    huffman_node_init_branching(&parent);
+
+    for (int symb = 0; symb < FLAT_TREE_SIZE; symb++)
+    {
+        size_t path_length     = flat[symb].length;
+        const bool* const path = flat[symb].path;
+
+        if (path_length <= 0)
+            continue;
+
+        huffman_node* working_node = &parent;
+        for (size_t j = 0; j < path_length - 1; j++)
+        {
+            assert(working_node != NULL);
+
+            bool branch_direction = path[j];
+            // const huffman_node* const sub_node = huffman_node_traverse(working_node, branch_direction);
+
+            if (huffman_node_traverse(working_node, branch_direction) == NULL)
+            {
+                huffman_node node = {0};
+                huffman_node_init_branching(&node);
+
+                if (branch_direction == HUFFMAN_BRANCH_RIGHT)
+                    huffman_node_assign_right(working_node, &node);
+
+                if (branch_direction == HUFFMAN_BRANCH_LEFT)
+                    huffman_node_assign_left(working_node, &node);
+            }
+
+            working_node = huffman_node_traverse(working_node, branch_direction);
+        }
+
+        huffman_node symbol_node = {0};
+        huffman_node_init_leaf(&symbol_node, symb, 0 /* <- we cannot know the count anymore, that's lost info */);
+
+        if (path[path_length - 1] == HUFFMAN_BRANCH_RIGHT)
+            huffman_node_assign_right(working_node, &symbol_node);
+
+        if (path[path_length - 1] == HUFFMAN_BRANCH_LEFT)
+            huffman_node_assign_left(working_node, &symbol_node);
+    }
+
+    return parent;
+}
+
 bitarray_length_t
 huffman_compress(
     const huffman_node* const root,

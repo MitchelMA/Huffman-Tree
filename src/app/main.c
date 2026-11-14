@@ -115,6 +115,12 @@ void print_bitarr_old(const bitarray* bitarray)
 
 int main(void)
 {
+    puts("Hello, World!");
+    return EXIT_SUCCESS;
+}
+
+int main7(void)
+{
     FILE* file = open_file_read("header.txt");
     huffman_header header = parse_header_stream(file);
     char header_buffer[256] = {0};
@@ -203,6 +209,9 @@ int main6(void)
     tree_root = huffman_construct_tree(counted_nodes);
     end_timer(&duration_timer);
 
+    flat_tree_value flat_tree[256] = {0};
+    huffman_flatten_tree(&tree_root, flat_tree);
+
     puts("Constructed tree");
 
     printf("Took %'0.lf clocks (%0.3lf seconds)\n", (double)timer_duration(&duration_timer), timer_seconds(&duration_timer));
@@ -252,6 +261,8 @@ int main6(void)
     print_bitarr(&rest_arr);
     puts("");
 
+    huffman_node_clean(&tree_root);
+    tree_root = huffman_unflatten_tree(flat_tree);
     // Write the restored bitarray into output so we know the whole process was successful or not
     close_file(text_fp);
     text_fp = open_file_write("./output");
