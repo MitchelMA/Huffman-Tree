@@ -2,6 +2,7 @@
 
 #include "utility.h"
 #include "io.h"
+#include "bitarray.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -271,6 +272,150 @@ huffman_flatten_tree(
     }
 
     return flattened_count;
+}
+
+
+huffman_node
+huffman_unflatten_tree(
+    const flat_tree_value* const flat
+)
+{
+
+    huffman_node parent = {0};
+    huffman_node_init_branching(&parent);
+
+    for (int symb = 0; symb < FLAT_TREE_SIZE; symb++)
+    {
+        size_t path_length     = flat[symb].length;
+        const bool* const path = flat[symb].path;
+
+        if (path_length <= 0)
+            continue;
+
+        huffman_node* working_node = &parent;
+        for (size_t j = 0; j < path_length - 1; j++)
+        {
+            assert(working_node != NULL);
+
+            bool branch_direction = path[j];
+            // const huffman_node* const sub_node = huffman_node_traverse(working_node, branch_direction);
+
+            if (huffman_node_traverse(working_node, branch_direction) == NULL)
+            {
+                huffman_node node = {0};
+                huffman_node_init_branching(&node);
+
+                if (branch_direction == HUFFMAN_BRANCH_RIGHT)
+                    huffman_node_assign_right(working_node, &node);
+
+                if (branch_direction == HUFFMAN_BRANCH_LEFT)
+                    huffman_node_assign_left(working_node, &node);
+            }
+
+            working_node = huffman_node_traverse(working_node, branch_direction);
+        }
+
+        huffman_node symbol_node = {0};
+        huffman_node_init_leaf(&symbol_node, symb, 0 /* <- we cannot know the count anymore, that's lost info */);
+
+        if (path[path_length - 1] == HUFFMAN_BRANCH_RIGHT)
+            huffman_node_assign_right(working_node, &symbol_node);
+
+        if (path[path_length - 1] == HUFFMAN_BRANCH_LEFT)
+            huffman_node_assign_left(working_node, &symbol_node);
+    }
+
+    return parent;
+}
+
+size_t
+huffman_serialise_tree(
+    const huffman_node* const root,
+    const size_t buffer_size,
+    uint8_t* const output_buffer
+)
+{
+    flat_tree_value flattened[FLAT_TREE_SIZE] = {0};
+    huffman_flatten_tree(root, flattened);
+
+    bitarray bit_array = {0};
+    size_t buffer_pos = 0;
+
+    for (int symb = 0; symb < FLAT_TREE_SIZE && buffer_pos < buffer_size; symb++)
+    {
+        size_t path_length     = flattened[symb].length;
+        const bool* const path = flattened[symb].path;
+
+        // Ignore symbols that aren't part of the tree
+        if (path_length <= 0)
+            continue;
+
+        bitarray_init_in_mem(&bit_array);
+
+        if (bitarray_append_bits(&bit_array, path_length, path) < (int64_t) path_length)
+        {
+            assert(false && "Failed to append correct bits to bitarray");
+        }
+
+        size_t byte_filling_count = (path_length >> 3) + ((path_length & 0b111) > 0);
+        uint8_t* raw_bytes = vector_get_start_addr_(bit_array.in_mem.content);
+
+        assert(path_length < 256);
+
+        if (buffer_pos < buffer_size)
+        {
+            output_buffer[buffer_pos++] = (uint8_t) symb;
+            output_buffer[buffer_pos++] = (uint8_t) path_length;
+            memcpy(output_buffer + buffer_pos, raw_bytes, byte_filling_count);
+            buffer_pos += byte_filling_count;
+        }
+
+        bitarray_clean(&bit_array);
+    }
+
+    output_buffer[buffer_pos] = '\0';
+
+    return buffer_pos;
+}
+
+huffman_node
+huffman_deserialise_tree(
+    const uint8_t* const data,
+    const size_t buffer_size
+)
+{
+    // Flat tree used for eventual unflattening
+    flat_tree_value flat[FLAT_TREE_SIZE] = {0};
+    uint8_t byte_values[128] = {0};
+
+    size_t buffer_pos = 0;
+
+    // Read entries in the format <sym><bit-count><bit-path-values>
+    bitarray bit_array = {0};
+    while (buffer_pos < buffer_size)
+    {
+        uint8_t symbol    = (uint8_t) data[buffer_pos++];
+        uint8_t bit_count = (uint8_t) data[buffer_pos++];
+        uint8_t byte_size = (uint8_t) (bit_count >> 3) + ((bit_count & 0b111) > 0);
+        memcpy(byte_values, data + buffer_pos, byte_size);
+        buffer_pos += byte_size;
+
+        // Unpack bitarray magic
+        bit_array.kind = BITARRAY_IN_MEM;
+        bit_array.in_mem.content = vector_create_from(sizeof(char), byte_size, (void*) byte_values);
+        bit_array.in_mem.bit_offset = bit_count & 0b111;
+
+        flat[symbol].length = bit_count;
+        if (bitarray_read_bits(&bit_array, 0, bit_count, flat[symbol].path) < bit_count)
+        {
+            assert(false && "Failed to get correct amount of bits back during deserialisation");
+        }
+
+        bitarray_clean(&bit_array);
+        memset(byte_values, 0, 128);
+    }
+
+    return huffman_unflatten_tree(flat);
 }
 
 bitarray_length_t

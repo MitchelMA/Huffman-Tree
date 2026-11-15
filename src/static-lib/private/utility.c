@@ -44,12 +44,12 @@ strnstr(
     if (needle_size > haystack_size)
         return NULL;
 
-    for (size_t i = 0; i < haystack_size - needle_size; i++)
-    {
-        int comparison = strncmp(haystack + i, needle, needle_size);
+    size_t hay_index = 0;
+    do {
+        int comparison = strncmp(haystack + hay_index, needle, needle_size);
         if (comparison == 0)
-            return haystack + i;
-    }
+            return haystack + hay_index;
+    } while (++hay_index < haystack_size - needle_size);
 
     return NULL;
 }

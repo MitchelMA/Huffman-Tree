@@ -57,6 +57,11 @@ huffman_node huffman_construct_tree(dlinked_list_node* root);
  */
 int huffman_flatten_tree(const huffman_node* root, flat_tree_value STATIC_SIZE_ARRAY flat STATIC_SIZE_ARRAY_SIZE(FLAT_TREE_SIZE));
 
+huffman_node huffman_unflatten_tree(const flat_tree_value STATIC_SIZE_ARRAY flat STATIC_SIZE_ARRAY_SIZE(FLAT_TREE_SIZE));
+
+size_t       huffman_serialise_tree  (const huffman_node* root, size_t buffer_size, uint8_t* output_buffer);
+huffman_node huffman_deserialise_tree(const uint8_t* data, size_t buffer_size);
+
 bitarray_length_t huffman_compress(const huffman_node* root, size_t buffer_size, const uint8_t* buffer, bitarray* out_bitarray);
 bitarray_length_t huffman_compress_stream(const huffman_node* root, FILE* in_stream, bitarray* out_bitarray);
 

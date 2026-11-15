@@ -11,11 +11,7 @@
 #define HEADER_END_INDICATOR "---"
 
 #define NEWLINE_PREDICATOR "-"
-#if defined(WIN32)
 #define NEWLINE "\r\n"
-#else
-#define NEWLINE "\n"
-#endif 
 
 static char* buffer_shift_append_(size_t buffer_size, char* buffer, char symbol);
 static void  keypair_clean_(void* pair);
@@ -100,7 +96,7 @@ parse_header_stream(
         if (i < header_line_count - 1)
             line_length = (long) (header_line_offsets[i+1] - header_line_offsets[i] - (newline_size + newline_pred_size));
         else
-            line_length = (long) (header_end_pos - header_line_offsets[i] - (newline_pred_size + newline_size));
+            line_length = (long) (header_end_pos - header_line_offsets[i] - (newline_pred_size + newline_size - 1));
 
         const char* const local_line_string = raw_text_buffer + header_line_offsets[i];
         void* const split_addr              = memchr(local_line_string, (int)':', line_length);
@@ -396,6 +392,10 @@ repurpose_buffer_(
     const size_t new_data_size
 )
 {
+    // Make sure that no buffer contains a newline_predicator + newline combination
+    if (strnstr(new_data, new_data_size, NEWLINE_PREDICATOR NEWLINE, strlen(NEWLINE_PREDICATOR NEWLINE)) != NULL)
+        return 0;
+
     if ((new_data_size + 1) > *buffer_size)
     {
         char* new_ptr = realloc(*buffer, new_data_size + 1);
@@ -421,6 +421,14 @@ vector_add_keypair_(
 )
 {
     if (header_entries == NULL || key == NULL || value == NULL)
+        return false;
+
+    // Make sure that no buffer contains a newline_predicator + newline combination
+    if (strnstr(key, key_length, NEWLINE_PREDICATOR NEWLINE, strlen(NEWLINE_PREDICATOR NEWLINE)) != NULL)
+        return false;
+
+    // Make sure that no buffer contains a newline_predicator + newline combination
+    if (strnstr(value, value_length, NEWLINE_PREDICATOR NEWLINE, strlen(NEWLINE_PREDICATOR NEWLINE)) != NULL)
         return false;
 
     if (vector_find_keypair_(header_entries, key_length, key) != NULL)
