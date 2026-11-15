@@ -392,6 +392,10 @@ repurpose_buffer_(
     const size_t new_data_size
 )
 {
+    // Make sure that no buffer contains a newline_predicator + newline combination
+    if (strnstr(new_data, new_data_size, NEWLINE_PREDICATOR NEWLINE, strlen(NEWLINE_PREDICATOR NEWLINE)) != NULL)
+        return 0;
+
     if ((new_data_size + 1) > *buffer_size)
     {
         char* new_ptr = realloc(*buffer, new_data_size + 1);
@@ -417,6 +421,14 @@ vector_add_keypair_(
 )
 {
     if (header_entries == NULL || key == NULL || value == NULL)
+        return false;
+
+    // Make sure that no buffer contains a newline_predicator + newline combination
+    if (strnstr(key, key_length, NEWLINE_PREDICATOR NEWLINE, strlen(NEWLINE_PREDICATOR NEWLINE)) != NULL)
+        return false;
+
+    // Make sure that no buffer contains a newline_predicator + newline combination
+    if (strnstr(value, value_length, NEWLINE_PREDICATOR NEWLINE, strlen(NEWLINE_PREDICATOR NEWLINE)) != NULL)
         return false;
 
     if (vector_find_keypair_(header_entries, key_length, key) != NULL)

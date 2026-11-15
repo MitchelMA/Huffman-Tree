@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <locale.h>
+#include <assert.h>
 
 #include "utility.h"
 #include "huffman_node.h"
@@ -153,7 +154,10 @@ int main(int argc, const char* argv[])
 
     serialisation_length = huffman_serialise_tree(&tree_root, 2048, serialisation_buffer);
     header_data = header_create_empty();
-    header_add_entry(&header_data, 3, "sft", serialisation_length, (char*)serialisation_buffer);
+    bool wrote_header = header_add_entry(&header_data, 3, "sft", serialisation_length, (char*)serialisation_buffer);
+
+    UNUSED(wrote_header);
+    assert(wrote_header);
 
     bitarray_init_in_mem(&data_bit_array);
     huffman_compress_stream(&tree_root, input_fp, &data_bit_array);
