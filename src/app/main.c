@@ -5,6 +5,11 @@
 #include <locale.h>
 #include <assert.h>
 
+#include <command.h>
+#include <option.h>
+#include <command_tree.h>
+#include <builtin-commands/help.h>
+
 #include "utility.h"
 #include "huffman_node.h"
 #include "huffman_processing.h"
@@ -13,6 +18,9 @@
 #include "header.h"
 
 #include "timer.h"
+
+static command_tree_s command_builder();
+static int handle_encrypt(command_s* command);
 
 // #define COUNTOF(ARR) ((&(ARR))[1] - (ARR))
 
@@ -116,12 +124,74 @@
 
 int main(int argc, const char* argv[])
 {
-    const char* compressed_extension = ".huff";
+    setlocale(LC_ALL, "");
 
-    if (argc < 2)
+    command_tree_s command_tree = command_builder();
+    int exit_code = EXIT_SUCCESS;
+
+    if (!command_tree_parse_base(&command_tree, argc, argv))
+    {
+        print_global_help(stdout, &command_tree);
+        exit_code = EXIT_FAILURE;
+        goto exit_cleanup;
+    }
+
+    command_s* used_command = command_tree_get_called_command(&command_tree);
+    assert(used_command != NULL);
+
+    if (!command_parse(used_command))
+    {
+
+        exit_code = EXIT_SUCCESS;
+        goto exit_cleanup;
+    }
+
+    if (handle_help_command(&command_tree, used_command))
+    {
+        exit_code = EXIT_SUCCESS;
+        goto exit_cleanup;
+    }
+
+    if (command_is_of_flag(used_command, "--encrypt"))
+    {
+        exit_code = handle_encrypt(used_command);
+        goto exit_cleanup;
+    }
+
+exit_cleanup:
+    command_tree_clean(&command_tree);
+
+    return exit_code;
+}
+
+command_tree_s
+command_builder()
+{
+    command_tree_s tree = {0};
+    command_tree_init(&tree, 3);
+
+    command_s encrypt_command = {0};
+    command_init(&encrypt_command, 0);
+    command_set_name(&encrypt_command, "--encrypt", 1, "-e");
+
+    command_tree_add_help(&tree);
+    command_tree_add_command(&tree, &encrypt_command);
+
+    return tree;
+}
+
+int
+handle_encrypt(
+    command_s* command
+)
+{
+    int param_count = 0;
+    const char** params = command_get_parameters(command, &param_count);
+
+    if (param_count <= 0)
         return EXIT_FAILURE;
 
-    setlocale(LC_ALL, "");
+     const char* compressed_extension = ".huff";
 
     int exit_code = EXIT_SUCCESS;
     FILE* input_fp = NULL;
@@ -131,10 +201,10 @@ int main(int argc, const char* argv[])
     bitarray data_bit_array = {0};
     huffman_header header_data = {0};
 
-    const char* input_filename = argv[1];
+    const char* input_filename = params[0];
     char output_filename[256] = {0};
-    uint8_t serialisation_buffer[2048] = {0};
 
+    uint8_t serialisation_buffer[2048] = {0};
     size_t serialisation_length = 0;
 
     strcpy(output_filename, input_filename);
@@ -145,7 +215,7 @@ int main(int argc, const char* argv[])
     if (input_fp == NULL)
     {
         exit_code = EXIT_FAILURE;
-        goto exit_cleanup;
+        goto exit_cleanup_encrypt;
     }
 
     dlinked_list_node* symbol_list = huffman_count_stream_table(input_fp);
@@ -166,13 +236,13 @@ int main(int argc, const char* argv[])
     if (output_fp == NULL)
     {
         exit_code = EXIT_FAILURE;
-        goto exit_cleanup;
+        goto exit_cleanup_encrypt;
     }
 
     header_flush_stream(&header_data, output_fp);
     bitarray_write_file(&data_bit_array, output_fp, -1);
 
-exit_cleanup:
+exit_cleanup_encrypt:
     bitarray_clean(&data_bit_array);
     huffman_node_clean(&tree_root);
     header_clean(&header_data);
