@@ -20,7 +20,8 @@
 #include "timer.h"
 
 static command_tree_s command_builder();
-static int handle_encrypt(command_s* command);
+static int handle_compress(command_s* command);
+static int handle_decompress(command_s* command);
 
 // #define COUNTOF(ARR) ((&(ARR))[1] - (ARR))
 
@@ -152,9 +153,15 @@ int main(int argc, const char* argv[])
         goto exit_cleanup;
     }
 
-    if (command_is_of_flag(used_command, "--encrypt"))
+    if (command_is_of_flag(used_command, "--compress"))
     {
-        exit_code = handle_encrypt(used_command);
+        exit_code = handle_compress(used_command);
+        goto exit_cleanup;
+    }
+
+    if (command_is_of_flag(used_command, "--decompress"))
+    {
+        exit_code = handle_decompress(used_command);
         goto exit_cleanup;
     }
 
@@ -169,19 +176,25 @@ command_builder()
 {
     command_tree_s tree = {0};
     command_tree_init(&tree, 3);
-
-    command_s encrypt_command = {0};
-    command_init(&encrypt_command, 0);
-    command_set_name(&encrypt_command, "--encrypt", 1, "-e");
-
     command_tree_add_help(&tree);
-    command_tree_add_command(&tree, &encrypt_command);
+
+    command_s compress_command = {0};
+    command_init(&compress_command, 0);
+    command_set_name(&compress_command, "--compress", 1, "-c");
+
+    command_tree_add_command(&tree, &compress_command);
+
+    command_s decompress_command = {0};
+    command_init(&decompress_command, 0);
+    command_set_name(&decompress_command, "--decompress", 1, "-d");
+
+    command_tree_add_command(&tree, &decompress_command);
 
     return tree;
 }
 
 int
-handle_encrypt(
+handle_compress(
     command_s* command
 )
 {
@@ -191,7 +204,7 @@ handle_encrypt(
     if (param_count <= 0)
         return EXIT_FAILURE;
 
-     const char* compressed_extension = ".huff";
+    const char* compressed_extension = ".huff";
 
     int exit_code = EXIT_SUCCESS;
     FILE* input_fp = NULL;
@@ -210,12 +223,14 @@ handle_encrypt(
     strcpy(output_filename, input_filename);
     strcat(output_filename, compressed_extension);
 
+    printf("output-filename: %s\n", output_filename);
+
     input_fp = open_file_read(input_filename);
 
     if (input_fp == NULL)
     {
         exit_code = EXIT_FAILURE;
-        goto exit_cleanup_encrypt;
+        goto exit_cleanup_compress;
     }
 
     dlinked_list_node* symbol_list = huffman_count_stream_table(input_fp);
@@ -236,19 +251,90 @@ handle_encrypt(
     if (output_fp == NULL)
     {
         exit_code = EXIT_FAILURE;
-        goto exit_cleanup_encrypt;
+        goto exit_cleanup_compress;
     }
 
     header_flush_stream(&header_data, output_fp);
     bitarray_write_file(&data_bit_array, output_fp, -1);
 
-exit_cleanup_encrypt:
+exit_cleanup_compress:
     bitarray_clean(&data_bit_array);
     huffman_node_clean(&tree_root);
     header_clean(&header_data);
 
     if (input_fp != NULL)
         fclose(input_fp);
+    if (output_fp != NULL)
+        fclose(output_fp);
+
+    return exit_code;
+}
+
+int
+handle_decompress(
+    command_s* command
+)
+{
+    int param_count = 0;
+    const char** params = command_get_parameters(command, &param_count);
+
+    if (param_count <= 0)
+        return EXIT_FAILURE;
+
+    const char* decompressed_extension = ".unhuff";
+
+    int exit_code = EXIT_SUCCESS;
+    FILE* input_fp = NULL;
+    FILE* output_fp = NULL;
+
+    huffman_node tree_root = {0};
+    bitarray data_bit_array = {0};
+    huffman_header header_data = {0};
+
+    const char* input_filename = params[0];
+    char output_filename[256] = {0};
+
+    uint8_t serialisation_buffer[2048] = {0};
+    size_t serialisation_length = 0;
+
+    strcpy(output_filename, input_filename);
+    *strrchr(output_filename, '.') = '\0';
+    strcat(output_filename, decompressed_extension);
+
+    printf("output-filename: %s\n", output_filename);
+
+    input_fp = open_file_read(input_filename);
+    if (input_fp == NULL)
+    {
+        exit_code = EXIT_FAILURE;
+        goto exit_cleanup_decompress;
+    }
+
+    header_data = parse_header_stream(input_fp);
+    serialisation_length = header_get_value(&header_data, 3, "sft", 2048, (char*) serialisation_buffer);
+    tree_root = huffman_deserialise_tree(serialisation_buffer, serialisation_length);
+
+    bitarray_init_in_mem(&data_bit_array);
+    bitarray_read_file(&data_bit_array, input_fp, -1);
+
+    output_fp = open_file_write(output_filename);
+    if (output_fp == NULL)
+    {
+        exit_code = EXIT_FAILURE;
+        goto exit_cleanup_decompress;
+    }
+
+    huffman_decompress_stream(&tree_root, &data_bit_array, output_fp);
+
+exit_cleanup_decompress:
+
+    huffman_node_clean(&tree_root);
+    header_clean(&header_data);
+    bitarray_clean(&data_bit_array);
+
+    if (input_fp != NULL)
+        fclose(input_fp);
+
     if (output_fp != NULL)
         fclose(output_fp);
 
