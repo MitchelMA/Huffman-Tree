@@ -122,6 +122,7 @@ int main(int argc, const char* argv[])
 
     setlocale(LC_ALL, "");
 
+    int exit_code = EXIT_SUCCESS;
     FILE* input_fp = NULL;
     FILE* output_fp = NULL;
 
@@ -141,7 +142,10 @@ int main(int argc, const char* argv[])
     input_fp = open_file_read(input_filename);
 
     if (input_fp == NULL)
-        return EXIT_FAILURE;
+    {
+        exit_code = EXIT_FAILURE;
+        goto exit_cleanup;
+    }
 
     dlinked_list_node* symbol_list = huffman_count_stream_table(input_fp);
     rewind(input_fp);
@@ -155,17 +159,26 @@ int main(int argc, const char* argv[])
     huffman_compress_stream(&tree_root, input_fp, &data_bit_array);
 
     output_fp = open_file_write(output_filename);
+    if (output_fp == NULL)
+    {
+        exit_code = EXIT_FAILURE;
+        goto exit_cleanup;
+    }
+
     header_flush_stream(&header_data, output_fp);
     bitarray_write_file(&data_bit_array, output_fp, -1);
 
-// exit_cleanup:
+exit_cleanup:
     bitarray_clean(&data_bit_array);
     huffman_node_clean(&tree_root);
     header_clean(&header_data);
-    fclose(input_fp);
-    fclose(output_fp);
 
-    return EXIT_SUCCESS;
+    if (input_fp != NULL)
+        fclose(input_fp);
+    if (output_fp != NULL)
+        fclose(output_fp);
+
+    return exit_code;
 }
 
 // int main(void)
