@@ -11,11 +11,7 @@
 #define HEADER_END_INDICATOR "---"
 
 #define NEWLINE_PREDICATOR "-"
-#if defined(WIN32)
 #define NEWLINE "\r\n"
-#else
-#define NEWLINE "\n"
-#endif 
 
 static char* buffer_shift_append_(size_t buffer_size, char* buffer, char symbol);
 static void  keypair_clean_(void* pair);
@@ -100,7 +96,7 @@ parse_header_stream(
         if (i < header_line_count - 1)
             line_length = (long) (header_line_offsets[i+1] - header_line_offsets[i] - (newline_size + newline_pred_size));
         else
-            line_length = (long) (header_end_pos - header_line_offsets[i] - (newline_pred_size + newline_size));
+            line_length = (long) (header_end_pos - header_line_offsets[i] - (newline_pred_size + newline_size - 1));
 
         const char* const local_line_string = raw_text_buffer + header_line_offsets[i];
         void* const split_addr              = memchr(local_line_string, (int)':', line_length);
