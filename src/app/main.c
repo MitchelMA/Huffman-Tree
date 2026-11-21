@@ -78,15 +78,22 @@ command_builder()
     command_tree_init(&tree, 3);
     command_tree_add_help(&tree);
 
+    option_s buffered_option = {0};
+    option_init(&buffered_option, false, OPTION_TYPE_BOOL, NULL);
+    option_set_name(&buffered_option, "--buffered", 1, "-b");
+    option_set_description(&buffered_option, "Wether the processing of compressing or decompressing is done through an io-stream, instead of in-memory");
+
     command_s compress_command = {0};
-    command_init(&compress_command, 0);
+    command_init(&compress_command, 1);
     command_set_name(&compress_command, "--compress", 1, "-c");
+    command_add_option(&compress_command, &buffered_option);
 
     command_tree_add_command(&tree, &compress_command);
 
     command_s decompress_command = {0};
-    command_init(&decompress_command, 0);
+    command_init(&decompress_command, 1);
     command_set_name(&decompress_command, "--decompress", 1, "-d");
+    command_add_option(&decompress_command, &buffered_option);
 
     command_tree_add_command(&tree, &decompress_command);
 
@@ -101,14 +108,18 @@ handle_compress(
     int param_count = 0;
     const char** params = command_get_parameters(command, &param_count);
 
+    bool is_io_buffered = command_read_bool_option(command, "--buffered");
+
     if (param_count <= 0)
         return EXIT_FAILURE;
 
-    const char* compressed_extension = ".huff";
+    const char* compressed_extension    = ".huff";
+    const char* bitarr_buffer_extension = ".buff";
 
     int exit_code = EXIT_SUCCESS;
     FILE* input_fp = NULL;
     FILE* output_fp = NULL;
+    FILE* bitarr_buffer = NULL;
 
     huffman_node tree_root = {0};
     bitarray data_bit_array = {0};
@@ -116,12 +127,16 @@ handle_compress(
 
     const char* input_filename = params[0];
     char output_filename[256] = {0};
+    char buffer_filename[256] = {0};
 
     uint8_t serialisation_buffer[2048] = {0};
     size_t serialisation_length = 0;
 
     strcpy(output_filename, input_filename);
     strcat(output_filename, compressed_extension);
+
+    strcpy(buffer_filename, input_filename);
+    strcat(buffer_filename, bitarr_buffer_extension);
 
     printf("output-filename: %s\n", output_filename);
 
@@ -144,7 +159,22 @@ handle_compress(
     UNUSED(wrote_header);
     assert(wrote_header);
 
-    bitarray_init_in_mem(&data_bit_array);
+    if (is_io_buffered)
+    {
+        bitarr_buffer = open_file_write(buffer_filename);
+        if (bitarr_buffer == NULL)
+        {
+            exit_code = EXIT_FAILURE;
+            goto exit_cleanup_compress;
+        }
+
+        bitarray_init_io_buffered(&data_bit_array, bitarr_buffer);
+    }
+    else
+    {
+        bitarray_init_in_mem(&data_bit_array);
+    }
+
     huffman_compress_stream(&tree_root, input_fp, &data_bit_array);
 
     output_fp = open_file_write(output_filename);
@@ -166,6 +196,8 @@ exit_cleanup_compress:
         fclose(input_fp);
     if (output_fp != NULL)
         fclose(output_fp);
+    if (bitarr_buffer != NULL)
+        remove(buffer_filename);
 
     return exit_code;
 }
@@ -178,14 +210,18 @@ handle_decompress(
     int param_count = 0;
     const char** params = command_get_parameters(command, &param_count);
 
+    bool is_io_buffered = command_read_bool_option(command, "--buffered");
+
     if (param_count <= 0)
         return EXIT_FAILURE;
 
-    const char* decompressed_extension = ".unhuff";
+    const char* decompressed_extension  = ".unhuff";
+    const char* bitarr_buffer_extension = ".buff";
 
     int exit_code = EXIT_SUCCESS;
     FILE* input_fp = NULL;
     FILE* output_fp = NULL;
+    FILE* bitarr_buffer = NULL;
 
     huffman_node tree_root = {0};
     bitarray data_bit_array = {0};
@@ -193,6 +229,7 @@ handle_decompress(
 
     const char* input_filename = params[0];
     char output_filename[256] = {0};
+    char buffer_filename[256] = {0};
 
     uint8_t serialisation_buffer[2048] = {0};
     size_t serialisation_length = 0;
@@ -200,6 +237,9 @@ handle_decompress(
     strcpy(output_filename, input_filename);
     *strrchr(output_filename, '.') = '\0';
     strcat(output_filename, decompressed_extension);
+
+    strcpy(buffer_filename, input_filename);
+    strcat(buffer_filename, bitarr_buffer_extension);
 
     printf("output-filename: %s\n", output_filename);
 
@@ -214,7 +254,21 @@ handle_decompress(
     serialisation_length = header_get_value(&header_data, 3, "sft", 2048, (char*) serialisation_buffer);
     tree_root = huffman_deserialise_tree(serialisation_buffer, serialisation_length);
 
-    bitarray_init_in_mem(&data_bit_array);
+    if (is_io_buffered)
+    {
+        bitarr_buffer = open_file_write(buffer_filename);
+        if (bitarr_buffer == NULL)
+        {
+            exit_code = EXIT_FAILURE;
+            goto exit_cleanup_decompress;
+        }
+
+        bitarray_init_io_buffered(&data_bit_array, bitarr_buffer);
+    }
+    else {
+        bitarray_init_in_mem(&data_bit_array);
+    }
+
     bitarray_read_file(&data_bit_array, input_fp, -1);
 
     output_fp = open_file_write(output_filename);
@@ -237,6 +291,9 @@ exit_cleanup_decompress:
 
     if (output_fp != NULL)
         fclose(output_fp);
+
+    if (bitarr_buffer != NULL)
+        remove(buffer_filename);
 
     return exit_code;
 }
