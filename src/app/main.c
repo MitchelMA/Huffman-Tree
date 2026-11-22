@@ -35,7 +35,7 @@ int main(int argc, const char* argv[])
         goto exit_cleanup;
     }
 
-    command_s* used_command = command_tree_get_called_command(&command_tree);
+    command_s* const used_command = command_tree_get_called_command(&command_tree);
     assert(used_command != NULL);
 
     if (!command_parse(used_command))
