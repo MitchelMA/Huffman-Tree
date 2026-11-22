@@ -17,11 +17,9 @@
 #include "io.h"
 #include "header.h"
 
-#include "timer.h"
-
 static command_tree_s command_builder();
-static int handle_compress(command_s* command);
-static int handle_decompress(command_s* command);
+static int handle_compress(const command_s* command);
+static int handle_decompress(const command_s* command);
 
 int main(int argc, const char* argv[])
 {
@@ -102,19 +100,19 @@ command_builder()
 
 int
 handle_compress(
-    command_s* command
+    const command_s* const command
 )
 {
     int param_count = 0;
     const char** params = command_get_parameters(command, &param_count);
 
-    bool is_io_buffered = command_read_bool_option(command, "--buffered");
+    const bool is_io_buffered = command_read_bool_option(command, "--buffered");
 
     if (param_count <= 0)
         return EXIT_FAILURE;
 
-    const char* compressed_extension    = ".huff";
-    const char* bitarr_buffer_extension = ".buff";
+    const char* const compressed_extension    = ".huff";
+    const char* const bitarr_buffer_extension = ".buff";
 
     int exit_code = EXIT_SUCCESS;
     FILE* input_fp = NULL;
@@ -125,7 +123,7 @@ handle_compress(
     bitarray data_bit_array = {0};
     huffman_header header_data = {0};
 
-    const char* input_filename = params[0];
+    const char* const input_filename = params[0];
     char output_filename[256] = {0};
     char buffer_filename[256] = {0};
 
@@ -148,13 +146,13 @@ handle_compress(
         goto exit_cleanup_compress;
     }
 
-    dlinked_list_node* symbol_list = huffman_count_stream_table(input_fp);
+    dlinked_list_node* const symbol_list = huffman_count_stream_table(input_fp);
     rewind(input_fp);
     tree_root = huffman_construct_tree(symbol_list);
 
     serialisation_length = huffman_serialise_tree(&tree_root, 2048, serialisation_buffer);
     header_data = header_create_empty();
-    bool wrote_header = header_add_entry(&header_data, 3, "sft", serialisation_length, (char*)serialisation_buffer);
+    const bool wrote_header = header_add_entry(&header_data, 3, "sft", serialisation_length, (char*)serialisation_buffer);
 
     UNUSED(wrote_header);
     assert(wrote_header);
@@ -204,19 +202,19 @@ exit_cleanup_compress:
 
 int
 handle_decompress(
-    command_s* command
+    const command_s* const command
 )
 {
     int param_count = 0;
     const char** params = command_get_parameters(command, &param_count);
 
-    bool is_io_buffered = command_read_bool_option(command, "--buffered");
+    const bool is_io_buffered = command_read_bool_option(command, "--buffered");
 
     if (param_count <= 0)
         return EXIT_FAILURE;
 
-    const char* decompressed_extension  = ".unhuff";
-    const char* bitarr_buffer_extension = ".buff";
+    const char* const decompressed_extension  = ".unhuff";
+    const char* const bitarr_buffer_extension = ".buff";
 
     int exit_code = EXIT_SUCCESS;
     FILE* input_fp = NULL;
@@ -227,7 +225,7 @@ handle_decompress(
     bitarray data_bit_array = {0};
     huffman_header header_data = {0};
 
-    const char* input_filename = params[0];
+    const char* const input_filename = params[0];
     char output_filename[256] = {0};
     char buffer_filename[256] = {0};
 
