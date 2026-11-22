@@ -3,7 +3,8 @@ add_executable(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
-    ${PROJECT_NAME}-static)
+    ${PROJECT_NAME}-static
+     CCommandArgParser)
 
     #$<$<STREQUAL:$<UPPER_CASE:${CMAKE_BUILD_TYPE}>,DEBUG>:asan ubsan>)
 

@@ -56,6 +56,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(CVector)
+FetchContent_MakeAvailable(CCommandArgParser)
 
 add_subdirectory(src/app)
 add_subdirectory(src/static-lib)
