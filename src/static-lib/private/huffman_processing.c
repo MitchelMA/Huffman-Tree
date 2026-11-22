@@ -927,7 +927,7 @@ compress_symbol_(
     // Obtain path-item from symbol
     const flat_tree_value item = flat_tree[symbol];
     const int64_t path_len = (int64_t) item.length;
-    const bool* path = item.path;
+    const bool* const path = item.path;
 
     // Assert that the path_len is always greater than 0
     assert(path_len > 0);
@@ -936,8 +936,8 @@ compress_symbol_(
         return false;
 
     // Insert the path into the output buffer
-    for (int64_t i = 0; i < path_len; i++)
-        out_buffer[(*out_processed)++] = path[i];
+    memcpy(out_buffer + *out_processed, path, path_len);
+    *out_processed += path_len;
 
     return true;
 }
